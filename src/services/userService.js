@@ -64,9 +64,20 @@ export const getPendingVendors = async () => {
   }
 };
 
-// Create new vendor with market fields
+// Create new vendor
 export const createVendor = async (vendorData) => {
   try {
+    // Check if phone already exists
+    const { data: existing } = await supabase
+      .from("users")
+      .select("phone")
+      .eq("phone", vendorData.phone)
+      .maybeSingle();
+
+    if (existing) {
+      throw new Error("Phone number already registered");
+    }
+
     const { data, error } = await supabase
       .from("users")
       .insert([
@@ -79,9 +90,9 @@ export const createVendor = async (vendorData) => {
           shop_name: vendorData.shopName,
           shop_number: vendorData.shopNumber,
           shop_address: vendorData.shopAddress,
-          shop_amount: vendorData.shopAmount,
-          market: vendorData.market,
-          market_id_card: vendorData.marketIdCard,
+          shop_amount: vendorData.shopAmount || 0,
+          market: vendorData.market || null,
+          market_id_card: vendorData.marketIdCard || null,
           password: vendorData.password,
           type: "vendor",
           verified: false,
@@ -90,7 +101,11 @@ export const createVendor = async (vendorData) => {
         },
       ])
       .select();
-    if (error) throw error;
+
+    if (error) {
+      console.error("Supabase insert error:", error);
+      throw error;
+    }
     return data?.[0] || null;
   } catch (error) {
     console.error("Error in createVendor:", error);
@@ -149,6 +164,10 @@ export const verifyVendor = async (id) => {
 // Delete vendor
 export const deleteVendor = async (id) => {
   try {
+    // First delete their motorcycles
+    await supabase.from("motorcycles").delete().eq("vendor_id", id);
+
+    // Then delete the vendor
     const { error } = await supabase.from("users").delete().eq("id", id);
     if (error) throw error;
     return true;

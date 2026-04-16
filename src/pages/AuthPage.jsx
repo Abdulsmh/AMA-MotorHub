@@ -25,7 +25,7 @@ const AuthPage = () => {
     shopNumber: "",
     shopAddress: "",
     email: "",
-    market: "fagge", // fagge, wapa, sabongari, france_road
+    market: "fagge",
     marketIdCard: null,
     confirmPassword: "",
   });
@@ -109,11 +109,11 @@ const AuthPage = () => {
 
       if (result.success) {
         setVerificationMessage(
-          "Registration successful! Please wait for admin verification before you can login.",
+          result.message ||
+            "Registration successful! Please wait for admin verification.",
         );
         // Clear form
         setFormData({
-          ...formData,
           fullName: "",
           phone: "",
           whatsapp: "",
@@ -125,8 +125,14 @@ const AuthPage = () => {
           marketIdCard: null,
           password: "",
           confirmPassword: "",
+          identifier: "",
         });
         setIdCardPreview(null);
+
+        // Redirect to login after 3 seconds
+        setTimeout(() => {
+          navigate("/login");
+        }, 3000);
       } else {
         setError(result.error || "Signup failed");
       }
@@ -314,6 +320,9 @@ const AuthPage = () => {
           {verificationMessage && (
             <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-3 py-2 rounded-lg text-xs">
               {verificationMessage}
+              <div className="text-[10px] text-yellow-600 mt-1">
+                Redirecting to login...
+              </div>
             </div>
           )}
 
@@ -328,8 +337,8 @@ const AuthPage = () => {
 
         {!isLogin && (
           <p className="text-xs text-gray-400 text-center mt-4">
-            Your application will be reviewed by admin. You'll receive a
-            verification email once approved.
+            Your application will be reviewed by admin. You'll receive SMS
+            notification once approved.
           </p>
         )}
       </div>

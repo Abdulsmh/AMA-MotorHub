@@ -118,14 +118,15 @@ export const AuthProvider = ({ children }) => {
       const newUser = await createVendor({
         ...userData,
         password: hashedPassword,
-        verified: false, // Explicitly unverified
+        verified: false,
       });
 
-      // Don't auto-login - return success without user
+      // Return success with message - user will be redirected to login
       return {
         success: true,
         user: null,
-        message: "Registration successful! Please wait for admin verification.",
+        message:
+          "Registration successful! Please wait for admin verification. You will be redirected to login.",
       };
     } catch (error) {
       console.error("Signup error:", error);
