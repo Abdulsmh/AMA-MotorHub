@@ -1,0 +1,190 @@
+import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { FiSearch, FiMapPin } from "react-icons/fi";
+import { FaWhatsapp } from "react-icons/fa";
+
+const CatalogPage = () => {
+  const [motorcycles, setMotorcycles] = useState([]);
+  const [filteredBikes, setFilteredBikes] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadCatalogData();
+  }, []);
+
+  useEffect(() => {
+    filterBikes();
+  }, [searchTerm, motorcycles]);
+
+  const loadCatalogData = () => {
+    // Get all motorcycles
+    const allBikes = JSON.parse(
+      localStorage.getItem("motorcycle_marketplace") || "[]",
+    );
+    const availableBikes = allBikes.filter(
+      (b) => b.status === "available" && b.quantity > 0,
+    );
+
+    // Get all vendors with priority
+    const users = JSON.parse(localStorage.getItem("motorcycle_users") || "[]");
+    const vendorMap = {};
+    users.forEach((u) => {
+      if (u.type === "vendor") {
+        vendorMap[u.id] = {
+          priority: u.priority || 0,
+          shopName: u.shopName,
+          shopNumber: u.shopNumber,
+          whatsapp: u.whatsapp,
+        };
+      }
+    });
+
+    // Attach shop priority to each bike and sort
+    const bikesWithPriority = availableBikes.map((bike) => ({
+      ...bike,
+      shopPriority: vendorMap[bike.vendorId]?.priority || 0,
+      shopName: vendorMap[bike.vendorId]?.shopName || "Unknown Shop",
+      shopNumber: vendorMap[bike.vendorId]?.shopNumber || "",
+      shopWhatsapp: vendorMap[bike.vendorId]?.whatsapp || "",
+    }));
+
+    // Sort by shop priority (higher first), then by creation date (newer first)
+    bikesWithPriority.sort((a, b) => {
+      if (a.shopPriority !== b.shopPriority)
+        return b.shopPriority - a.shopPriority;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+    setMotorcycles(bikesWithPriority);
+    setFilteredBikes(bikesWithPriority);
+    setLoading(false);
+  };
+
+  const filterBikes = () => {
+    let filtered = [...motorcycles];
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (bike) =>
+          bike.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          bike.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          bike.shopName.toLowerCase().includes(searchTerm.toLowerCase()),
+      );
+    }
+    setFilteredBikes(filtered);
+  };
+
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat("en-NG").format(price);
+  };
+
+  if (loading) {
+    return <div className="text-center py-10">Loading catalog...</div>;
+  }
+
+  return (
+    <div className="px-3 sm:px-4 md:px-6">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">Motorcycle Catalog</h1>
+        <p className="text-gray-500 text-sm">
+          Browse quality motorcycles from trusted vendors
+        </p>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative mb-6">
+        <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search by name, brand, or shop..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-emerald-500"
+        />
+      </div>
+
+      {/* Results Count */}
+      <div className="text-xs text-gray-500 mb-3">
+        {filteredBikes.length} motorcycle{filteredBikes.length !== 1 ? "s" : ""}{" "}
+        found
+      </div>
+
+      {/* Motorcycle Grid */}
+      {filteredBikes.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
+          <p className="text-gray-500">No motorcycles found</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          {filteredBikes.map((bike) => (
+            <Link
+              key={bike.id}
+              to={`/shop/${bike.vendorId}`}
+              className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition group"
+            >
+              {/* Image */}
+              <div className="aspect-square bg-gray-100">
+                {bike.images && bike.images[0] ? (
+                  <img
+                    src={bike.images[0]}
+                    alt={bike.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                    No image
+                  </div>
+                )}
+              </div>
+
+              {/* Content */}
+              <div className="p-3">
+                <h3 className="font-semibold text-gray-800 text-sm truncate">
+                  {bike.name}
+                </h3>
+                <p className="text-xs text-gray-500">{bike.brand}</p>
+                <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                  <FiMapPin className="w-3 h-3" />
+                  {bike.shopName}
+                </p>
+                <p className="text-sm font-bold text-emerald-600 mt-2">
+                  ₦{formatPrice(bike.price)}
+                </p>
+                <div className="mt-2 flex justify-between items-center">
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                      bike.status === "available"
+                        ? bike.quantity <= 3
+                          ? "bg-yellow-100 text-yellow-700"
+                          : "bg-green-100 text-green-700"
+                        : "bg-red-100 text-red-700"
+                    }`}
+                  >
+                    {bike.status === "available"
+                      ? bike.quantity <= 3
+                        ? `Low Stock`
+                        : "In Stock"
+                      : "Sold"}
+                  </span>
+                  <a
+                    href={`https://wa.me/${bike.shopWhatsapp}?text=Hello%2C%20I'm%20interested%20in%20your%20${encodeURIComponent(bike.name)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-green-600 hover:text-green-700"
+                  >
+                    <FaWhatsapp className="w-4 h-4" />
+                  </a>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default CatalogPage;
