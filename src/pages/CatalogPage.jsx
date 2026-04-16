@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { FiSearch, FiMapPin } from "react-icons/fi";
+import { FiSearch, FiMapPin, FiCheckCircle } from "react-icons/fi";
 import { FaWhatsapp } from "react-icons/fa";
+import { supabase } from "../lib/supabase";
 
 const CatalogPage = () => {
   const [motorcycles, setMotorcycles] = useState([]);
   const [filteredBikes, setFilteredBikes] = useState([]);
-  const [vendors, setVendors] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -18,48 +18,62 @@ const CatalogPage = () => {
     filterBikes();
   }, [searchTerm, motorcycles]);
 
-  const loadCatalogData = () => {
-    // Get all motorcycles
-    const allBikes = JSON.parse(
-      localStorage.getItem("motorcycle_marketplace") || "[]",
-    );
-    const availableBikes = allBikes.filter(
-      (b) => b.status === "available" && b.quantity > 0,
-    );
+  const loadCatalogData = async () => {
+    try {
+      setLoading(true);
 
-    // Get all vendors with priority
-    const users = JSON.parse(localStorage.getItem("motorcycle_users") || "[]");
-    const vendorMap = {};
-    users.forEach((u) => {
-      if (u.type === "vendor") {
-        vendorMap[u.id] = {
-          priority: u.priority || 0,
-          shopName: u.shopName,
-          shopNumber: u.shopNumber,
-          whatsapp: u.whatsapp,
+      // Get all available motorcycles with vendor info
+      const { data: bikes, error: bikesError } = await supabase
+        .from("motorcycles")
+        .select("*")
+        .eq("status", "available")
+        .gt("quantity", 0);
+
+      if (bikesError) throw bikesError;
+
+      // Get all vendors for shop info and verification status
+      const { data: vendors, error: vendorsError } = await supabase
+        .from("users")
+        .select("id, shop_name, shop_number, whatsapp, priority, verified")
+        .eq("type", "vendor");
+
+      if (vendorsError) throw vendorsError;
+
+      // Create vendor map
+      const vendorMap = {};
+      vendors.forEach((vendor) => {
+        vendorMap[vendor.id] = {
+          shopName: vendor.shop_name,
+          shopNumber: vendor.shop_number,
+          whatsapp: vendor.whatsapp,
+          priority: vendor.priority || 0,
+          verified: vendor.verified || false,
         };
-      }
-    });
+      });
 
-    // Attach shop priority to each bike and sort
-    const bikesWithPriority = availableBikes.map((bike) => ({
-      ...bike,
-      shopPriority: vendorMap[bike.vendorId]?.priority || 0,
-      shopName: vendorMap[bike.vendorId]?.shopName || "Unknown Shop",
-      shopNumber: vendorMap[bike.vendorId]?.shopNumber || "",
-      shopWhatsapp: vendorMap[bike.vendorId]?.whatsapp || "",
-    }));
+      // Attach vendor info to bikes
+      const bikesWithVendors = (bikes || []).map((bike) => ({
+        ...bike,
+        shopName: vendorMap[bike.vendor_id]?.shopName || "Unknown Shop",
+        shopWhatsapp: vendorMap[bike.vendor_id]?.whatsapp || "",
+        shopPriority: vendorMap[bike.vendor_id]?.priority || 0,
+        shopVerified: vendorMap[bike.vendor_id]?.verified || false,
+      }));
 
-    // Sort by shop priority (higher first), then by creation date (newer first)
-    bikesWithPriority.sort((a, b) => {
-      if (a.shopPriority !== b.shopPriority)
-        return b.shopPriority - a.shopPriority;
-      return new Date(b.createdAt) - new Date(a.createdAt);
-    });
+      // Sort by priority (higher first), then by creation date
+      bikesWithVendors.sort((a, b) => {
+        if (a.shopPriority !== b.shopPriority)
+          return b.shopPriority - a.shopPriority;
+        return new Date(b.created_at) - new Date(a.created_at);
+      });
 
-    setMotorcycles(bikesWithPriority);
-    setFilteredBikes(bikesWithPriority);
-    setLoading(false);
+      setMotorcycles(bikesWithVendors);
+      setFilteredBikes(bikesWithVendors);
+    } catch (error) {
+      console.error("Error loading catalog:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filterBikes = () => {
@@ -67,9 +81,9 @@ const CatalogPage = () => {
     if (searchTerm) {
       filtered = filtered.filter(
         (bike) =>
-          bike.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          bike.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          bike.shopName.toLowerCase().includes(searchTerm.toLowerCase()),
+          bike.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          bike.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          bike.shopName?.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
     setFilteredBikes(filtered);
@@ -80,7 +94,11 @@ const CatalogPage = () => {
   };
 
   if (loading) {
-    return <div className="text-center py-10">Loading catalog...</div>;
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-gray-500">Loading catalog...</div>
+      </div>
+    );
   }
 
   return (
@@ -121,7 +139,7 @@ const CatalogPage = () => {
           {filteredBikes.map((bike) => (
             <Link
               key={bike.id}
-              to={`/shop/${bike.vendorId}`}
+              to={`/shop/${bike.vendor_id}`}
               className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition group"
             >
               {/* Image */}
@@ -141,13 +159,22 @@ const CatalogPage = () => {
 
               {/* Content */}
               <div className="p-3">
-                <h3 className="font-semibold text-gray-800 text-sm truncate">
-                  {bike.name}
-                </h3>
+                <div className="flex items-start justify-between gap-1">
+                  <h3 className="font-semibold text-gray-800 text-sm truncate flex-1">
+                    {bike.name}
+                  </h3>
+                  {/* Verified Badge */}
+                  {bike.shopVerified && (
+                    <span className="inline-flex items-center gap-0.5 text-[9px] bg-blue-50 text-blue-600 px-1 py-0.5 rounded-full flex-shrink-0">
+                      <FiCheckCircle className="w-2 h-2" />
+                      <span className="hidden sm:inline">Verified</span>
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-gray-500">{bike.brand}</p>
                 <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
                   <FiMapPin className="w-3 h-3" />
-                  {bike.shopName}
+                  <span className="truncate">{bike.shopName}</span>
                 </p>
                 <p className="text-sm font-bold text-emerald-600 mt-2">
                   ₦{formatPrice(bike.price)}

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { supabase } from "../../lib/supabase";
 import {
   FiSearch,
   FiCheckCircle,
   FiXCircle,
   FiTrash2,
-  FiEye,
   FiStar,
+  FiFile,
+  FiEye,
 } from "react-icons/fi";
 
 const AdminVendors = () => {
@@ -17,23 +18,45 @@ const AdminVendors = () => {
   const [loading, setLoading] = useState(true);
   const [editingPriority, setEditingPriority] = useState(null);
   const [priorityValue, setPriorityValue] = useState(0);
+  const [viewingDocument, setViewingDocument] = useState(null);
 
   useEffect(() => {
     loadVendors();
+
+    // Set up real-time subscription for vendor updates
+    const subscription = supabase
+      .channel("users_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "users" },
+        () => {
+          loadVendors();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  useEffect(() => {
-    filterVendors();
-  }, [searchTerm, filter, vendors]);
+  const loadVendors = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("type", "vendor")
+        .order("created_at", { ascending: false });
 
-  const loadVendors = () => {
-    const users = JSON.parse(localStorage.getItem("motorcycle_users") || "[]");
-    const vendorList = users.filter((u) => u.type === "vendor");
-    // Sort by priority (higher first)
-    vendorList.sort((a, b) => (b.priority || 0) - (a.priority || 0));
-    setVendors(vendorList);
-    setFilteredVendors(vendorList);
-    setLoading(false);
+      if (error) throw error;
+      setVendors(data || []);
+      setFilteredVendors(data || []);
+    } catch (error) {
+      console.error("Error loading vendors:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filterVendors = () => {
@@ -46,63 +69,97 @@ const AdminVendors = () => {
     if (searchTerm) {
       filtered = filtered.filter(
         (v) =>
-          v.shopName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          v.shop_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           v.phone?.includes(searchTerm) ||
-          v.fullName?.toLowerCase().includes(searchTerm.toLowerCase()),
+          v.full_name?.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
     setFilteredVendors(filtered);
   };
 
-  const verifyVendor = (id) => {
-    const updatedVendors = vendors.map((v) =>
-      v.id === id ? { ...v, verified: true } : v,
-    );
-    setVendors(updatedVendors);
-    localStorage.setItem("motorcycle_users", JSON.stringify(updatedVendors));
-    alert("Vendor verified successfully!");
+  useEffect(() => {
+    filterVendors();
+  }, [searchTerm, filter, vendors]);
+
+  const verifyVendor = async (id) => {
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({ verified: true })
+        .eq("id", id);
+
+      if (error) throw error;
+      await loadVendors();
+      alert("Vendor verified successfully!");
+    } catch (error) {
+      console.error("Error verifying vendor:", error);
+      alert("Error verifying vendor");
+    }
   };
 
-  const deleteVendor = (id) => {
+  const deleteVendor = async (id) => {
     if (
       window.confirm(
         "Are you sure you want to delete this vendor? All their motorcycles will also be deleted.",
       )
     ) {
-      const updatedVendors = vendors.filter((v) => v.id !== id);
-      setVendors(updatedVendors);
-      localStorage.setItem("motorcycle_users", JSON.stringify(updatedVendors));
-      const motorcycles = JSON.parse(
-        localStorage.getItem("motorcycle_marketplace") || "[]",
-      );
-      const updatedMotorcycles = motorcycles.filter((m) => m.vendorId !== id);
-      localStorage.setItem(
-        "motorcycle_marketplace",
-        JSON.stringify(updatedMotorcycles),
-      );
-      alert("Vendor deleted successfully!");
+      try {
+        const { error } = await supabase.from("users").delete().eq("id", id);
+        if (error) throw error;
+
+        // Also delete their motorcycles
+        await supabase.from("motorcycles").delete().eq("vendor_id", id);
+
+        await loadVendors();
+        alert("Vendor deleted successfully!");
+      } catch (error) {
+        console.error("Error deleting vendor:", error);
+        alert("Error deleting vendor");
+      }
     }
   };
 
-  const updatePriority = (id, newPriority) => {
-    const updatedVendors = vendors.map((v) =>
-      v.id === id ? { ...v, priority: newPriority } : v,
-    );
-    updatedVendors.sort((a, b) => (b.priority || 0) - (a.priority || 0));
-    setVendors(updatedVendors);
-    localStorage.setItem("motorcycle_users", JSON.stringify(updatedVendors));
-    setEditingPriority(null);
-    alert(`Priority updated to ${newPriority}`);
+  const updatePriority = async (id, newPriority) => {
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({ priority: newPriority })
+        .eq("id", id);
+
+      if (error) throw error;
+      await loadVendors();
+      setEditingPriority(null);
+      alert(`Priority updated to ${newPriority}`);
+    } catch (error) {
+      console.error("Error updating priority:", error);
+      alert("Error updating priority");
+    }
   };
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-NG");
+    return date.toLocaleDateString("en-NG", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  const getMarketLabel = (market) => {
+    const markets = {
+      fagge: "Fagge Market",
+      wapa: "Wapa Market",
+      sabongari: "Sabongari Market",
+      france_road: "France Road Market",
+    };
+    return markets[market] || market;
   };
 
   if (loading) {
-    return <div className="text-center py-10 text-gray-500">Loading...</div>;
+    return (
+      <div className="text-center py-10 text-gray-500">Loading vendors...</div>
+    );
   }
 
   return (
@@ -171,7 +228,7 @@ const AdminVendors = () => {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-semibold text-gray-800">
-                      {vendor.shopName}
+                      {vendor.shop_name}
                     </h3>
                     {vendor.verified ? (
                       <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full flex items-center gap-1">
@@ -182,14 +239,13 @@ const AdminVendors = () => {
                         <FiXCircle className="w-3 h-3" /> Pending
                       </span>
                     )}
-                    {/* Priority Badge */}
                     <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full flex items-center gap-1">
                       <FiStar className="w-3 h-3" /> Priority:{" "}
                       {vendor.priority || 0}
                     </span>
                   </div>
                   <p className="text-sm text-gray-600 mt-1">
-                    {vendor.fullName}
+                    {vendor.full_name}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
                     📞 {vendor.phone}
@@ -198,13 +254,27 @@ const AdminVendors = () => {
                     📧 {vendor.email || "N/A"}
                   </p>
                   <p className="text-xs text-gray-500">
-                    📍 {vendor.shopAddress}
+                    📍 {vendor.shop_address}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    🏪 {getMarketLabel(vendor.market)}
                   </p>
                   <p className="text-xs text-gray-400 mt-2">
-                    Joined: {formatDate(vendor.createdAt)}
+                    Joined: {formatDate(vendor.created_at)}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {/* View Document Button */}
+                  {vendor.market_id_card && (
+                    <button
+                      onClick={() => setViewingDocument(vendor.market_id_card)}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 text-xs rounded-lg hover:bg-blue-100 transition"
+                    >
+                      <FiFile className="w-3 h-3" />
+                      View Document
+                    </button>
+                  )}
+
                   {/* Priority Control */}
                   {editingPriority === vendor.id ? (
                     <div className="flex items-center gap-2">
@@ -243,6 +313,7 @@ const AdminVendors = () => {
                       Set Priority
                     </button>
                   )}
+
                   {!vendor.verified && (
                     <button
                       onClick={() => verifyVendor(vendor.id)}
@@ -252,6 +323,7 @@ const AdminVendors = () => {
                       Verify
                     </button>
                   )}
+
                   <button
                     onClick={() => deleteVendor(vendor.id)}
                     className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 text-xs rounded-lg hover:bg-red-100 transition"
@@ -263,6 +335,42 @@ const AdminVendors = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Document View Modal */}
+      {viewingDocument && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setViewingDocument(null)}
+        >
+          <div
+            className="bg-white rounded-xl max-w-lg w-full p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Market ID Document
+              </h3>
+              <button
+                onClick={() => setViewingDocument(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            <img
+              src={viewingDocument}
+              alt="Market ID"
+              className="w-full rounded-lg"
+            />
+            <button
+              onClick={() => setViewingDocument(null)}
+              className="mt-4 w-full py-2 bg-gray-100 rounded-lg text-sm"
+            >
+              Close
+            </button>
+          </div>
         </div>
       )}
     </div>

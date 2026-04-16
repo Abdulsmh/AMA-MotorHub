@@ -9,6 +9,8 @@ import {
   FiBriefcase,
   FiMapPin,
   FiMessageCircle,
+  FiUpload,
+  FiFile,
 } from "react-icons/fi";
 
 const AuthPage = () => {
@@ -23,28 +25,58 @@ const AuthPage = () => {
     shopNumber: "",
     shopAddress: "",
     email: "",
+    market: "fagge", // fagge, wapa, sabongari, france_road
+    marketIdCard: null,
     confirmPassword: "",
   });
+  const [idCardPreview, setIdCardPreview] = useState(null);
   const [error, setError] = useState("");
+  const [verificationMessage, setVerificationMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { login, signup } = useAuth();
 
+  const markets = [
+    { value: "fagge", label: "Fagge Market" },
+    { value: "wapa", label: "Wapa Market" },
+    { value: "sabongari", label: "Sabongari Market" },
+    { value: "france_road", label: "France Road Market" },
+  ];
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setError("");
+    setVerificationMessage("");
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        setError("File must be less than 2MB");
+        return;
+      }
+      if (!file.type.startsWith("image/")) {
+        setError("Please upload an image file");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setIdCardPreview(reader.result);
+        setFormData({ ...formData, marketIdCard: reader.result });
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setVerificationMessage("");
 
     if (isLogin) {
-      // FIXED: Added await here
       const result = await login(formData.identifier, formData.password);
-      console.log("Login result:", result);
-
       if (result.success) {
         navigate("/");
       } else {
@@ -56,6 +88,12 @@ const AuthPage = () => {
         setLoading(false);
         return;
       }
+      if (!formData.marketIdCard) {
+        setError("Please upload your market ID card");
+        setLoading(false);
+        return;
+      }
+
       const result = await signup({
         fullName: formData.fullName,
         phone: formData.phone,
@@ -64,10 +102,31 @@ const AuthPage = () => {
         shopNumber: formData.shopNumber,
         shopAddress: formData.shopAddress,
         email: formData.email,
+        market: formData.market,
+        marketIdCard: formData.marketIdCard,
         password: formData.password,
       });
+
       if (result.success) {
-        navigate("/");
+        setVerificationMessage(
+          "Registration successful! Please wait for admin verification before you can login.",
+        );
+        // Clear form
+        setFormData({
+          ...formData,
+          fullName: "",
+          phone: "",
+          whatsapp: "",
+          shopName: "",
+          shopNumber: "",
+          shopAddress: "",
+          email: "",
+          market: "fagge",
+          marketIdCard: null,
+          password: "",
+          confirmPassword: "",
+        });
+        setIdCardPreview(null);
       } else {
         setError(result.error || "Signup failed");
       }
@@ -123,72 +182,125 @@ const AuthPage = () => {
               />
             </>
           ) : (
-            <div className="space-y-2 max-h-[400px] overflow-y-auto px-1">
+            <div className="space-y-2 max-h-[500px] overflow-y-auto px-1">
               <input
                 name="fullName"
-                placeholder="Full name"
+                placeholder="Full name *"
                 value={formData.fullName}
                 onChange={handleChange}
                 className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-200 rounded-lg"
+                required
               />
               <input
                 name="phone"
-                placeholder="Phone number"
+                placeholder="Phone number *"
                 value={formData.phone}
                 onChange={handleChange}
                 className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-200 rounded-lg"
+                required
               />
               <input
                 name="whatsapp"
-                placeholder="WhatsApp number"
+                placeholder="WhatsApp number *"
                 value={formData.whatsapp}
                 onChange={handleChange}
                 className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-200 rounded-lg"
+                required
               />
               <input
                 name="email"
-                placeholder="Email"
+                placeholder="Email *"
                 value={formData.email}
                 onChange={handleChange}
                 className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-200 rounded-lg"
+                required
               />
               <input
                 name="shopName"
-                placeholder="Shop name"
+                placeholder="Shop name *"
                 value={formData.shopName}
                 onChange={handleChange}
                 className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-200 rounded-lg"
+                required
               />
               <input
                 name="shopNumber"
-                placeholder="Shop number"
+                placeholder="Shop number *"
                 value={formData.shopNumber}
                 onChange={handleChange}
                 className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-200 rounded-lg"
+                required
               />
               <textarea
                 name="shopAddress"
-                placeholder="Shop address"
+                placeholder="Shop address *"
                 value={formData.shopAddress}
                 onChange={handleChange}
                 rows="2"
                 className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-200 rounded-lg"
+                required
               />
+
+              {/* Market Selection */}
+              <select
+                name="market"
+                value={formData.market}
+                onChange={handleChange}
+                className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-200 rounded-lg"
+                required
+              >
+                {markets.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+
+              {/* Market ID Card Upload */}
+              <div className="border border-gray-200 rounded-lg p-3">
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Market ID Card / Document *
+                </label>
+                <div className="flex items-center gap-3">
+                  <label className="cursor-pointer flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition">
+                    <FiUpload className="w-4 h-4" />
+                    Upload Document
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                  {idCardPreview && (
+                    <span className="text-xs text-green-600 flex items-center gap-1">
+                      <FiFile className="w-3 h-3" /> Document uploaded
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  Upload your market ID card or shop registration document (max
+                  2MB)
+                </p>
+              </div>
+
               <input
                 type="password"
                 name="password"
-                placeholder="Password"
+                placeholder="Password *"
                 value={formData.password}
                 onChange={handleChange}
                 className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-200 rounded-lg"
+                required
               />
               <input
                 type="password"
                 name="confirmPassword"
-                placeholder="Confirm password"
+                placeholder="Confirm password *"
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-200 rounded-lg"
+                required
               />
             </div>
           )}
@@ -196,6 +308,12 @@ const AuthPage = () => {
           {error && (
             <div className="bg-red-50 text-red-600 px-3 py-2 rounded-lg text-xs">
               {error}
+            </div>
+          )}
+
+          {verificationMessage && (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-3 py-2 rounded-lg text-xs">
+              {verificationMessage}
             </div>
           )}
 
@@ -210,7 +328,8 @@ const AuthPage = () => {
 
         {!isLogin && (
           <p className="text-xs text-gray-400 text-center mt-4">
-            Your shop will be verified by admin
+            Your application will be reviewed by admin. You'll receive a
+            verification email once approved.
           </p>
         )}
       </div>

@@ -47,7 +47,24 @@ export const getUserByPhone = async (phone) => {
   }
 };
 
-// Create new vendor
+// Get pending vendors (unverified)
+export const getPendingVendors = async () => {
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("type", "vendor")
+      .eq("verified", false)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error("Error in getPendingVendors:", error);
+    return [];
+  }
+};
+
+// Create new vendor with market fields
 export const createVendor = async (vendorData) => {
   try {
     const { data, error } = await supabase
@@ -63,6 +80,8 @@ export const createVendor = async (vendorData) => {
           shop_number: vendorData.shopNumber,
           shop_address: vendorData.shopAddress,
           shop_amount: vendorData.shopAmount,
+          market: vendorData.market,
+          market_id_card: vendorData.marketIdCard,
           password: vendorData.password,
           type: "vendor",
           verified: false,
@@ -107,6 +126,22 @@ export const updateVendorPriority = async (id, priority) => {
     return data?.[0] || null;
   } catch (error) {
     console.error("Error in updateVendorPriority:", error);
+    return null;
+  }
+};
+
+// Verify vendor
+export const verifyVendor = async (id) => {
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .update({ verified: true })
+      .eq("id", id)
+      .select();
+    if (error) throw error;
+    return data?.[0] || null;
+  } catch (error) {
+    console.error("Error in verifyVendor:", error);
     return null;
   }
 };

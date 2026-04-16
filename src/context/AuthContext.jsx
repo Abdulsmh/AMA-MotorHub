@@ -16,7 +16,6 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored session
     const storedUser = localStorage.getItem("motorcycle_current_user");
     if (storedUser) {
       try {
@@ -59,6 +58,15 @@ export const AuthProvider = ({ children }) => {
       try {
         const vendor = await getUserByPhone(identifier);
         if (vendor && vendor.type === "vendor") {
+          // Check if vendor is verified
+          if (!vendor.verified) {
+            return {
+              success: false,
+              error:
+                "Your account is pending verification. Please wait for admin approval.",
+            };
+          }
+
           const isPasswordValid = bcrypt.compareSync(password, vendor.password);
           if (isPasswordValid) {
             const vendorUser = {
@@ -71,8 +79,11 @@ export const AuthProvider = ({ children }) => {
               whatsapp: vendor.whatsapp,
               email: vendor.email,
               profilePicture: vendor.profile_picture,
+              market: vendor.market,
+              marketIdCard: vendor.market_id_card,
               type: "vendor",
               role: "vendor",
+              verified: vendor.verified,
             };
             localStorage.setItem(
               "motorcycle_current_user",
@@ -107,28 +118,15 @@ export const AuthProvider = ({ children }) => {
       const newUser = await createVendor({
         ...userData,
         password: hashedPassword,
+        verified: false, // Explicitly unverified
       });
 
-      const vendorUser = {
-        id: newUser.id,
-        name: newUser.full_name,
-        phone: newUser.phone,
-        shopName: newUser.shop_name,
-        shopNumber: newUser.shop_number,
-        shopAddress: newUser.shop_address,
-        whatsapp: newUser.whatsapp,
-        email: newUser.email,
-        type: "vendor",
-        role: "vendor",
+      // Don't auto-login - return success without user
+      return {
+        success: true,
+        user: null,
+        message: "Registration successful! Please wait for admin verification.",
       };
-      localStorage.setItem(
-        "motorcycle_current_user",
-        JSON.stringify(vendorUser),
-      );
-      setUser(vendorUser);
-      setIsAuthenticated(true);
-      setUserType("vendor");
-      return { success: true, user: vendorUser };
     } catch (error) {
       console.error("Signup error:", error);
       return { success: false, error: error.message };
