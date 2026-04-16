@@ -1,48 +1,97 @@
 import React, { useState, useEffect } from "react";
-import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import { Link } from "react-router-dom";
+import { FiChevronLeft, FiChevronRight, FiArrowRight } from "react-icons/fi";
 
 const HeroCarousel = () => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
   const slides = [
     {
       id: 1,
-      image: "https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=1200",
       title: "Haojue HJ150",
-      subtitle: "Reliable & Fuel Efficient",
       brand: "Haojue",
+      description:
+        "Reliable and fuel-efficient motorcycle perfect for Nigerian roads. Features powerful engine and comfortable seat.",
+      price: "₦850,000",
+      image:
+        "https://images.unsplash.com/photo-1580273916550-e323be2ae537?w=600",
+      buttonText: "Shop Now",
+      buttonLink: "/catalog",
+      bgColor: "from-amber-600 to-orange-600",
     },
     {
       id: 2,
-      image: "/kpr_fi_green_product_image.jpg",
-      title: "Lifan KPR 150",
-      subtitle: "Sporty Design, Great Performance",
-      brand: "Lifan",
+      title: "Honda CG 125",
+      brand: "Honda",
+      description:
+        "Legendary durability and fuel economy. Perfect for daily commuting and commercial use.",
+      price: "₦950,000",
+      image:
+        "https://images.unsplash.com/photo-1590362891991-f776e747a588?w=600",
+      buttonText: "Shop Now",
+      buttonLink: "/catalog",
+      bgColor: "from-emerald-600 to-teal-600",
     },
     {
       id: 3,
+      title: "Lifan KPR 150",
+      brand: "Lifan",
+      description:
+        "Sporty design with excellent performance. Great value for money with modern features.",
+      price: "₦780,000",
       image:
-        "https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=1200",
-      title: "Lucky Plus 125",
-      subtitle: "Affordable & Durable",
-      brand: "Lucky Plus",
+        "https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=600",
+      buttonText: "Shop Now",
+      buttonLink: "/catalog",
+      bgColor: "from-blue-600 to-indigo-600",
     },
     {
       id: 4,
+      title: "Royal Enfield Classic 350",
+      brand: "Royal Enfield",
+      description:
+        "Premium classic motorcycle with timeless design. Powerful engine and exceptional build quality.",
+      price: "₦2,450,000",
       image:
-        "/motobi-keeway.jfif",
-      title: "Motobi 200",
-      subtitle: "Powerful & Stylish",
-      brand: "Motobi",
+        "https://images.unsplash.com/photo-1627413009835-ef1c41b0d847?w=600",
+      buttonText: "Shop Now",
+      buttonLink: "/catalog",
+      bgColor: "from-purple-600 to-pink-600",
+    },
+    {
+      id: 5,
+      title: "Yamaha MT-15",
+      brand: "Yamaha",
+      description:
+        "Aggressive streetfighter design with liquid-cooled engine. Perfect for city riding.",
+      price: "₦1,350,000",
+      image:
+        "https://images.unsplash.com/photo-1616425708412-1187e86f7c9c?w=600",
+      buttonText: "Shop Now",
+      buttonLink: "/catalog",
+      bgColor: "from-red-600 to-rose-600",
+    },
+    {
+      id: 6,
+      title: "Suzuki GSX-S150",
+      brand: "Suzuki",
+      description:
+        "Sporty naked bike with excellent handling and modern features.",
+      price: "₦1,250,000",
+      image:
+        "https://images.unsplash.com/photo-1616425708412-1187e86f7c9c?w=600",
+      buttonText: "Shop Now",
+      buttonLink: "/catalog",
+      bgColor: "from-cyan-600 to-blue-600",
     },
   ];
-
-  const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % slides.length);
-    }, 5000);
+    }, 6000);
     return () => clearInterval(interval);
-  }, []);
+  }, [slides.length]);
 
   const goToSlide = (index) => {
     setCurrentIndex(index);
@@ -56,59 +105,94 @@ const HeroCarousel = () => {
     setCurrentIndex((prev) => (prev - 1 + slides.length) % slides.length);
   };
 
+  const currentSlide = slides[currentIndex];
+
   return (
-    <div className="relative overflow-hidden rounded-2xl shadow-lg">
+    <div className="relative overflow-hidden rounded-2xl shadow-xl mb-8">
+      {/* Main Carousel Container */}
       <div
-        className="flex transition-transform duration-500 ease-out"
-        style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+        className={`relative bg-gradient-to-r ${currentSlide.bgColor} min-h-[400px] md:min-h-[450px] overflow-hidden`}
       >
-        {slides.map((slide) => (
-          <div key={slide.id} className="w-full flex-shrink-0 relative">
-            <img
-              src={slide.image}
-              alt={slide.title}
-              className="w-full h-[300px] sm:h-[400px] md:h-[500px] object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-6 sm:p-8 md:p-12">
-              <p className="text-emerald-300 text-sm sm:text-base font-semibold">
-                {slide.brand}
-              </p>
-              <h2 className="text-white text-2xl sm:text-3xl md:text-4xl font-bold mt-1">
-                {slide.title}
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -mr-32 -mt-32"></div>
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-white rounded-full -ml-48 -mb-48"></div>
+        </div>
+
+        <div className="relative z-10 container mx-auto px-4 py-8 md:py-12">
+          <div className="flex flex-col md:flex-row items-center gap-8">
+            {/* Left Side - Text Content */}
+            <div className="flex-1 text-center md:text-left">
+              <div className="inline-block bg-white/20 backdrop-blur-sm rounded-full px-3 py-1 text-xs font-semibold text-white mb-4">
+                🔥 Featured Motorcycle
+              </div>
+              <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2">
+                {currentSlide.title}
               </h2>
-              <p className="text-gray-200 text-sm sm:text-base mt-1">
-                {slide.subtitle}
+              <p className="text-emerald-100 text-sm md:text-base font-medium mb-2">
+                {currentSlide.brand}
               </p>
-              <button className="mt-4 bg-emerald-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 transition w-fit">
-                Shop Now
-              </button>
+              <p className="text-white/80 text-sm md:text-base mb-4 max-w-md mx-auto md:mx-0">
+                {currentSlide.description}
+              </p>
+              <div className="flex items-center justify-center md:justify-start gap-2 mb-6">
+                <span className="text-2xl md:text-3xl font-bold text-yellow-300">
+                  {currentSlide.price}
+                </span>
+                <span className="text-white/60 text-sm">(excl. delivery)</span>
+              </div>
+              <Link
+                to={currentSlide.buttonLink}
+                className="inline-flex items-center gap-2 bg-white text-gray-800 px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-100 transition shadow-lg"
+              >
+                {currentSlide.buttonText}
+                <FiArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+
+            {/* Right Side - Image */}
+            <div className="flex-1 flex justify-center">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent rounded-2xl"></div>
+                <img
+                  src={currentSlide.image}
+                  alt={currentSlide.title}
+                  className="w-full max-w-sm md:max-w-md lg:max-w-lg rounded-2xl shadow-2xl transform hover:scale-105 transition duration-500"
+                />
+                {/* Badge */}
+                <div className="absolute -top-3 -right-3 bg-yellow-400 text-gray-800 rounded-full px-3 py-1 text-xs font-bold shadow-lg">
+                  HOT DEAL
+                </div>
+              </div>
             </div>
           </div>
-        ))}
+        </div>
       </div>
 
       {/* Navigation Arrows */}
       <button
         onClick={prevSlide}
-        className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/30 hover:bg-white/50 rounded-full p-2 backdrop-blur-sm transition"
+        className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/30 hover:bg-white/50 backdrop-blur-sm rounded-full p-2 transition-all duration-200 z-20"
       >
         <FiChevronLeft className="w-5 h-5 text-white" />
       </button>
       <button
         onClick={nextSlide}
-        className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/30 hover:bg-white/50 rounded-full p-2 backdrop-blur-sm transition"
+        className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/30 hover:bg-white/50 backdrop-blur-sm rounded-full p-2 transition-all duration-200 z-20"
       >
         <FiChevronRight className="w-5 h-5 text-white" />
       </button>
 
-      {/* Dots */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+      {/* Dots Indicator */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
         {slides.map((_, idx) => (
           <button
             key={idx}
             onClick={() => goToSlide(idx)}
-            className={`w-2 h-2 rounded-full transition-all ${
-              currentIndex === idx ? "bg-emerald-500 w-4" : "bg-white/50"
+            className={`transition-all duration-300 rounded-full ${
+              currentIndex === idx
+                ? "w-6 h-2 bg-white"
+                : "w-2 h-2 bg-white/50 hover:bg-white/80"
             }`}
           />
         ))}

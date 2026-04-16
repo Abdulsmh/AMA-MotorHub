@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
+import HeroCarousel from "../components/HeroCarousel";
 import {
   FiMapPin,
   FiCheckCircle,
@@ -90,51 +91,50 @@ const HomePage = () => {
 
   const getWelcomeMessage = () => {
     if (!isAuthenticated) {
-      return {
-        title: "Find Your Perfect Ride",
-        subtitle: "Browse quality motorcycles from trusted vendors",
-      };
+      return null;
     }
     if (userType === "admin") {
       return {
         title: `Welcome back, Admin`,
         subtitle: "Manage your platform",
+        buttonLink: "/admin/dashboard",
       };
     }
     if (userType === "vendor") {
       return {
         title: `Welcome back, ${user?.shopName || user?.name}`,
         subtitle: "Manage your shop inventory and sales",
+        buttonLink: "/vendor/dashboard",
       };
     }
-    return {
-      title: "Find Your Perfect Ride",
-      subtitle: "Browse quality motorcycles from trusted vendors",
-    };
+    return null;
   };
 
   const welcome = getWelcomeMessage();
 
   return (
     <div className="w-full">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-r from-emerald-700 to-emerald-600 rounded-2xl text-white overflow-hidden mb-6">
-        <div className="px-4 py-8 sm:px-6 sm:py-10 text-center">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">
-            {welcome.title}
-          </h1>
-          <p className="text-emerald-100 text-sm mb-5">{welcome.subtitle}</p>
+      {/* Hero Carousel - Only for non-authenticated users */}
+      {!isAuthenticated && <HeroCarousel />}
 
-          <Link
-            to="/catalog"
-            className="inline-flex items-center gap-2 bg-white text-gray-800 px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-100 transition shadow-lg"
-          >
-            <FiSearch className="w-4 h-4" />
-            Search Motorcycles
-            <FiArrowRight className="w-4 h-4" />
-          </Link>
+      {/* Welcome Banner for logged-in users */}
+      {isAuthenticated && welcome && (
+        <div className="bg-gradient-to-r from-emerald-700 to-emerald-600 rounded-2xl text-white overflow-hidden mb-6">
+          <div className="px-4 py-8 sm:px-6 sm:py-10 text-center">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">
+              {welcome.title}
+            </h1>
+            <p className="text-emerald-100 text-sm mb-5">{welcome.subtitle}</p>
+            <Link
+              to={welcome.buttonLink}
+              className="inline-flex items-center gap-2 bg-white text-emerald-700 px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-100 transition shadow-lg"
+            >
+              Go to Dashboard
+              <FiArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Featured Motorcycles Section */}
       <div className="mb-8">
