@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import { supabase } from "../lib/supabase";
 import {
   FiPackage,
   FiMapPin,
   FiPhone,
   FiMail,
   FiArrowLeft,
+  FiCheckCircle,
 } from "react-icons/fi";
 import { FaWhatsapp } from "react-icons/fa";
 
@@ -19,25 +21,37 @@ const ShopPage = () => {
     loadShopData();
   }, [vendorId]);
 
-  const loadShopData = () => {
-    // Get vendor info
-    const users = JSON.parse(localStorage.getItem("motorcycle_users") || "[]");
-    const vendor = users.find((u) => u.id === vendorId && u.type === "vendor");
+  const loadShopData = async () => {
+    try {
+      setLoading(true);
 
-    if (!vendor) {
+      // Get vendor info
+      const { data: vendor, error: vendorError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", vendorId)
+        .single();
+
+      if (vendorError) throw vendorError;
+
+      // Get vendor's motorcycles
+      const { data: bikes, error: bikesError } = await supabase
+        .from("motorcycles")
+        .select("*")
+        .eq("vendor_id", vendorId)
+        .eq("status", "available")
+        .gt("quantity", 0)
+        .order("created_at", { ascending: false });
+
+      if (bikesError) throw bikesError;
+
+      setShop(vendor);
+      setMotorcycles(bikes || []);
+    } catch (error) {
+      console.error("Error loading shop:", error);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // Get vendor's motorcycles
-    const allBikes = JSON.parse(
-      localStorage.getItem("motorcycle_marketplace") || "[]",
-    );
-    const vendorBikes = allBikes.filter((bike) => bike.vendorId === vendorId);
-
-    setShop(vendor);
-    setMotorcycles(vendorBikes);
-    setLoading(false);
   };
 
   const formatPrice = (price) => {
@@ -54,7 +68,6 @@ const ShopPage = () => {
 
   return (
     <div className="px-3 sm:px-4 md:px-6">
-      {/* Back Button */}
       <Link
         to="/catalog"
         className="inline-flex items-center gap-2 text-emerald-600 hover:text-emerald-700 mb-4"
@@ -67,27 +80,34 @@ const ShopPage = () => {
       <div className="bg-white rounded-xl border border-gray-100 p-4 sm:p-6 mb-6">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="w-24 h-24 bg-gray-100 rounded-full overflow-hidden flex-shrink-0 mx-auto sm:mx-0">
-            {shop.profilePicture ? (
+            {shop.profile_picture ? (
               <img
-                src={shop.profilePicture}
-                alt={shop.shopName}
+                src={shop.profile_picture}
+                alt={shop.shop_name}
                 className="w-full h-full object-cover"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-3xl bg-emerald-100 text-emerald-600">
-                {shop.shopName?.charAt(0).toUpperCase()}
+                {shop.shop_name?.charAt(0).toUpperCase()}
               </div>
             )}
           </div>
           <div className="flex-1 text-center sm:text-left">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
-              {shop.shopName}
-            </h1>
-            <p className="text-gray-500 text-sm mt-1">{shop.shopNumber}</p>
+            <div className="flex items-center justify-center sm:justify-start gap-2">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
+                {shop.shop_name}
+              </h1>
+              {shop.verified && (
+                <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
+                  <FiCheckCircle className="w-3 h-3" /> Verified
+                </span>
+              )}
+            </div>
+            <p className="text-gray-500 text-sm mt-1">{shop.shop_number}</p>
             <div className="flex flex-wrap justify-center sm:justify-start gap-3 mt-3">
-              {shop.shopAddress && (
+              {shop.shop_address && (
                 <span className="flex items-center gap-1 text-xs text-gray-500">
-                  <FiMapPin className="w-3 h-3" /> {shop.shopAddress}
+                  <FiMapPin className="w-3 h-3" /> {shop.shop_address}
                 </span>
               )}
               {shop.phone && (
@@ -112,7 +132,7 @@ const ShopPage = () => {
 
       {/* Motorcycles List */}
       <h2 className="text-lg font-semibold text-gray-800 mb-4">
-        Motorcycles from {shop.shopName}
+        Motorcycles from {shop.shop_name}
       </h2>
 
       {motorcycles.length === 0 ? (

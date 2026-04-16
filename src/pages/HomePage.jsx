@@ -22,54 +22,67 @@ const HomePage = () => {
   const loadFeaturedBikes = async () => {
     try {
       setLoading(true);
-      // Get all available motorcycles with vendor info
+
+      console.log("Fetching featured motorcycles...");
+
       const { data: bikes, error } = await supabase
         .from("motorcycles")
-        .select(
-          `
-        *,
-        users!motorcycles_vendor_id_fkey (
-          id,
-          shop_name,
-          shop_number,
-          whatsapp,
-          priority,
-          verified
-        )
-      `,
-        )
+        .select("*")
         .eq("status", "available")
-        .gt("quantity", 0);
+        .gt("quantity", 0)
+        .order("created_at", { ascending: false })
+        .limit(8);
 
       if (error) {
-        console.error("Supabase error:", error);
-        throw error;
-      }
-
-      console.log("HomePage featured bikes loaded:", bikes?.length);
-
-      if (!bikes || bikes.length === 0) {
-        setFeaturedBikes([]);
+        console.error("Error loading bikes:", error);
         return;
       }
 
-      // Sort by shop priority (higher first), then by creation date
-      const sortedBikes = bikes.sort((a, b) => {
-        const priorityA = a.users?.priority || 0;
-        const priorityB = b.users?.priority || 0;
-        if (priorityA !== priorityB) return priorityB - priorityA;
-        return new Date(b.created_at) - new Date(a.created_at);
-      });
+      console.log("Featured bikes found:", bikes?.length || 0);
 
-      // Take top 8 for featured section
-      setFeaturedBikes(sortedBikes.slice(0, 8));
+      if (!bikes || bikes.length === 0) {
+        setFeaturedBikes([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get vendor info
+      const vendorIds = [
+        ...new Set(bikes.map((b) => b.vendor_id).filter(Boolean)),
+      ];
+
+      let vendorMap = {};
+      if (vendorIds.length > 0) {
+        const { data: vendors } = await supabase
+          .from("users")
+          .select("id, shop_name, whatsapp, priority, verified")
+          .in("id", vendorIds);
+
+        vendors?.forEach((v) => {
+          vendorMap[v.id] = {
+            shopName: v.shop_name || "Unknown Shop",
+            whatsapp: v.whatsapp || "",
+            priority: v.priority || 0,
+            verified: v.verified || false,
+          };
+        });
+      }
+
+      const bikesWithVendors = bikes.map((bike) => ({
+        ...bike,
+        shopName: vendorMap[bike.vendor_id]?.shopName || "Unknown Shop",
+        shopWhatsapp: vendorMap[bike.vendor_id]?.whatsapp || "",
+        shopPriority: vendorMap[bike.vendor_id]?.priority || 0,
+        shopVerified: vendorMap[bike.vendor_id]?.verified || false,
+      }));
+
+      setFeaturedBikes(bikesWithVendors);
     } catch (error) {
       console.error("Error loading featured bikes:", error);
     } finally {
       setLoading(false);
     }
   };
-  
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat("en-NG").format(price);
@@ -123,11 +136,11 @@ const HomePage = () => {
         </div>
       </div>
 
-      {/* Featured Motorcycles Section - Sorted by Priority */}
+      {/* Featured Motorcycles Section */}
       <div className="mb-8">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg sm:text-xl font-bold text-gray-800">
-            🔥 Premium Motorcycles
+            🔥 Latest Arrivals
           </h2>
           <Link
             to="/catalog"
@@ -154,15 +167,6 @@ const HomePage = () => {
                 to={`/shop/${bike.vendor_id}`}
                 className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition group"
               >
-                {/* Priority Badge for premium shops */}
-                {bike.users?.priority > 0 && (
-                  <div className="absolute top-2 left-2 z-10">
-                    <span className="bg-amber-500 text-white text-[9px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                      ⭐ Premium
-                    </span>
-                  </div>
-                )}
-
                 <div className="aspect-square bg-gray-100">
                   {bike.images && bike.images[0] ? (
                     <img
@@ -181,7 +185,7 @@ const HomePage = () => {
                     <h3 className="font-semibold text-gray-800 text-sm truncate flex-1">
                       {bike.name}
                     </h3>
-                    {bike.users?.verified && (
+                    {bike.shopVerified && (
                       <span className="inline-flex items-center gap-0.5 text-[9px] bg-blue-50 text-blue-600 px-1 py-0.5 rounded-full flex-shrink-0">
                         <FiCheckCircle className="w-2 h-2" />
                       </span>
@@ -190,9 +194,7 @@ const HomePage = () => {
                   <p className="text-xs text-gray-500">{bike.brand}</p>
                   <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1 truncate">
                     <FiMapPin className="w-3 h-3 flex-shrink-0" />
-                    <span className="truncate">
-                      {bike.users?.shop_name || "Unknown Shop"}
-                    </span>
+                    <span className="truncate">{bike.shopName}</span>
                   </p>
                   <p className="text-sm font-bold text-emerald-600 mt-2">
                     ₦{formatPrice(bike.price)}
@@ -210,7 +212,7 @@ const HomePage = () => {
                         : "In Stock"}
                     </span>
                     <a
-                      href={`https://wa.me/${bike.users?.whatsapp}?text=Hello%2C%20I'm%20interested%20in%20your%20${encodeURIComponent(bike.name)}`}
+                      href={`https://wa.me/${bike.shopWhatsapp}?text=Hello%2C%20I'm%20interested%20in%20your%20${encodeURIComponent(bike.name)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}

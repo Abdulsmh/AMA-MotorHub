@@ -22,37 +22,52 @@ const Marketplace = () => {
     try {
       setLoading(true);
 
-      // Get all available motorcycles
-      const { data: bikes, error: bikesError } = await supabase
+      console.log("Fetching marketplace motorcycles...");
+
+      const { data: bikes, error } = await supabase
         .from("motorcycles")
         .select("*")
         .eq("status", "available")
-        .gt("quantity", 0);
+        .gt("quantity", 0)
+        .order("created_at", { ascending: false });
 
-      if (bikesError) throw bikesError;
+      if (error) {
+        console.error("Error loading bikes:", error);
+        throw error;
+      }
 
-      // Get all vendors for shop info
-      const { data: vendors, error: vendorsError } = await supabase
-        .from("users")
-        .select("id, shop_name, shop_number, whatsapp, priority, verified")
-        .eq("type", "vendor");
+      console.log("Marketplace bikes found:", bikes?.length || 0);
 
-      if (vendorsError) throw vendorsError;
+      if (!bikes || bikes.length === 0) {
+        setMotorcycles([]);
+        setFilteredBikes([]);
+        setLoading(false);
+        return;
+      }
 
-      // Create vendor map
-      const vendorMap = {};
-      vendors.forEach((vendor) => {
-        vendorMap[vendor.id] = {
-          shopName: vendor.shop_name,
-          shopNumber: vendor.shop_number,
-          whatsapp: vendor.whatsapp,
-          priority: vendor.priority || 0,
-          verified: vendor.verified || false,
-        };
-      });
+      // Get vendor info
+      const vendorIds = [
+        ...new Set(bikes.map((b) => b.vendor_id).filter(Boolean)),
+      ];
 
-      // Attach vendor info to bikes
-      const bikesWithVendors = (bikes || []).map((bike) => ({
+      let vendorMap = {};
+      if (vendorIds.length > 0) {
+        const { data: vendors } = await supabase
+          .from("users")
+          .select("id, shop_name, whatsapp, priority, verified")
+          .in("id", vendorIds);
+
+        vendors?.forEach((v) => {
+          vendorMap[v.id] = {
+            shopName: v.shop_name || "Unknown Shop",
+            whatsapp: v.whatsapp || "",
+            priority: v.priority || 0,
+            verified: v.verified || false,
+          };
+        });
+      }
+
+      const bikesWithVendors = bikes.map((bike) => ({
         ...bike,
         shopName: vendorMap[bike.vendor_id]?.shopName || "Unknown Shop",
         shopWhatsapp: vendorMap[bike.vendor_id]?.whatsapp || "",
@@ -60,7 +75,7 @@ const Marketplace = () => {
         shopVerified: vendorMap[bike.vendor_id]?.verified || false,
       }));
 
-      // Sort by priority (higher first)
+      // Sort by priority
       bikesWithVendors.sort((a, b) => {
         if (a.shopPriority !== b.shopPriority)
           return b.shopPriority - a.shopPriority;
@@ -159,7 +174,6 @@ const Marketplace = () => {
                   {bike.shopVerified && (
                     <span className="inline-flex items-center gap-0.5 text-[9px] bg-blue-50 text-blue-600 px-1 py-0.5 rounded-full flex-shrink-0">
                       <FiCheckCircle className="w-2 h-2" />
-                      <span className="hidden sm:inline">Verified</span>
                     </span>
                   )}
                 </div>
@@ -173,7 +187,13 @@ const Marketplace = () => {
                 </p>
                 <div className="mt-2 flex justify-between items-center">
                   <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full ${bike.status === "available" ? (bike.quantity <= 3 ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700") : "bg-red-100 text-red-700"}`}
+                    className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                      bike.status === "available"
+                        ? bike.quantity <= 3
+                          ? "bg-yellow-100 text-yellow-700"
+                          : "bg-green-100 text-green-700"
+                        : "bg-red-100 text-red-700"
+                    }`}
                   >
                     {bike.status === "available"
                       ? bike.quantity <= 3

@@ -30,8 +30,6 @@ import Announcements from "./pages/vendor/Announcements";
 import VendorSettings from "./pages/vendor/VendorSettings";
 import VendorDashboard from "./pages/vendor/VendorDashboard";
 
-import TestDb from "./pages/TestDb";
-import DebugDb from "./pages/DebugDb";
 
 function App() {
   return (
@@ -40,11 +38,6 @@ function App() {
         <ScrollToTop />
         <MainLayout>
           <Routes>
-            // Add route
-            <Route path="/test-db" element={<TestDb />} />;
-            <Route path="/debug" element={<DebugDb />} />;
-            
-            
             {/* Public Routes */}
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<AuthPage />} />

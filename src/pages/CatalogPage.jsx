@@ -18,72 +18,89 @@ const CatalogPage = () => {
     filterBikes();
   }, [searchTerm, motorcycles]);
 
- const loadCatalogData = async () => {
-   try {
-     setLoading(true);
+  const loadCatalogData = async () => {
+    try {
+      setLoading(true);
 
-     // Get all available motorcycles with vendor info - explicitly filter status
-     const { data: bikes, error } = await supabase
-       .from("motorcycles")
-       .select(
-         `
-        *,
-        users!motorcycles_vendor_id_fkey (
-          id,
-          shop_name,
-          shop_number,
-          whatsapp,
-          priority,
-          verified
-        )
-      `,
-       )
-       .eq("status", "available")
-       .gt("quantity", 0);
+      console.log("Fetching motorcycles...");
 
-     if (error) {
-       console.error("Supabase error:", error);
-       throw error;
-     }
+      // First, get all available motorcycles
+      const { data: bikes, error: bikesError } = await supabase
+        .from("motorcycles")
+        .select("*")
+        .eq("status", "available")
+        .gt("quantity", 0)
+        .order("created_at", { ascending: false });
 
-     console.log("Catalog bikes loaded:", bikes?.length);
+      if (bikesError) {
+        console.error("Bikes error:", bikesError);
+        throw bikesError;
+      }
 
-     if (!bikes || bikes.length === 0) {
-       console.log(
-         "No motorcycles found with status='available' and quantity>0",
-       );
-       setMotorcycles([]);
-       setFilteredBikes([]);
-       return;
-     }
+      console.log("Motorcycles found:", bikes?.length || 0);
 
-     // Transform data
-     const bikesWithVendors = bikes.map((bike) => ({
-       ...bike,
-       shopName: bike.users?.shop_name || "Unknown Shop",
-       shopWhatsapp: bike.users?.whatsapp || "",
-       shopPriority: bike.users?.priority || 0,
-       shopVerified: bike.users?.verified || false,
-       vendor_id: bike.vendor_id,
-     }));
+      if (!bikes || bikes.length === 0) {
+        setMotorcycles([]);
+        setFilteredBikes([]);
+        setLoading(false);
+        return;
+      }
 
-     // Sort by shop priority (higher first)
-     bikesWithVendors.sort((a, b) => {
-       if (a.shopPriority !== b.shopPriority)
-         return b.shopPriority - a.shopPriority;
-       return new Date(b.created_at) - new Date(a.created_at);
-     });
+      // Get all unique vendor IDs
+      const vendorIds = [
+        ...new Set(bikes.map((bike) => bike.vendor_id).filter(Boolean)),
+      ];
 
-     setMotorcycles(bikesWithVendors);
-     setFilteredBikes(bikesWithVendors);
-   } catch (error) {
-     console.error("Error loading catalog:", error);
-   } finally {
-     setLoading(false);
-   }
+      console.log("Vendor IDs:", vendorIds);
+
+      // Get vendor information
+      let vendorMap = {};
+      if (vendorIds.length > 0) {
+        const { data: vendors, error: vendorsError } = await supabase
+          .from("users")
+          .select("id, shop_name, whatsapp, priority, verified")
+          .in("id", vendorIds);
+
+        if (vendorsError) {
+          console.error("Vendors error:", vendorsError);
+        } else {
+          console.log("Vendors found:", vendors?.length || 0);
+          vendors?.forEach((vendor) => {
+            vendorMap[vendor.id] = {
+              shopName: vendor.shop_name || "Unknown Shop",
+              whatsapp: vendor.whatsapp || "",
+              priority: vendor.priority || 0,
+              verified: vendor.verified || false,
+            };
+          });
+        }
+      }
+
+      // Combine data
+      const bikesWithVendors = bikes.map((bike) => ({
+        ...bike,
+        shopName: vendorMap[bike.vendor_id]?.shopName || "Unknown Shop",
+        shopWhatsapp: vendorMap[bike.vendor_id]?.whatsapp || "",
+        shopPriority: vendorMap[bike.vendor_id]?.priority || 0,
+        shopVerified: vendorMap[bike.vendor_id]?.verified || false,
+      }));
+
+      // Sort by priority (higher first), then by creation date
+      bikesWithVendors.sort((a, b) => {
+        if (a.shopPriority !== b.shopPriority)
+          return b.shopPriority - a.shopPriority;
+        return new Date(b.created_at) - new Date(a.created_at);
+      });
+
+      setMotorcycles(bikesWithVendors);
+      setFilteredBikes(bikesWithVendors);
+    } catch (error) {
+      console.error("Error loading catalog:", error);
+    } finally {
+      setLoading(false);
+    }
   };
-  
-  
+
   const filterBikes = () => {
     let filtered = [...motorcycles];
     if (searchTerm) {
@@ -150,15 +167,6 @@ const CatalogPage = () => {
               to={`/shop/${bike.vendor_id}`}
               className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition group"
             >
-              {/* Premium Badge for high priority shops */}
-              {bike.shopPriority >= 50 && (
-                <div className="absolute top-2 left-2 z-10">
-                  <span className="bg-amber-500 text-white text-[9px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                    ⭐ Premium
-                  </span>
-                </div>
-              )}
-
               {/* Image */}
               <div className="aspect-square bg-gray-100">
                 {bike.images && bike.images[0] ? (
@@ -184,7 +192,6 @@ const CatalogPage = () => {
                   {bike.shopVerified && (
                     <span className="inline-flex items-center gap-0.5 text-[9px] bg-blue-50 text-blue-600 px-1 py-0.5 rounded-full flex-shrink-0">
                       <FiCheckCircle className="w-2 h-2" />
-                      <span className="hidden sm:inline">Verified</span>
                     </span>
                   )}
                 </div>
