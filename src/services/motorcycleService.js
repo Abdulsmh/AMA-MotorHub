@@ -79,17 +79,14 @@ export const addMotorcycle = async (
     console.log("=== ADD MOTORCYCLE DEBUG ===");
     console.log("Vendor ID:", vendorId);
     console.log("Shop Name:", shopName);
-    console.log("Motorcycle data:", motorcycle);
     
     // Upload main image
     let mainImageUrl = "";
     if (mainImageFile) {
-      console.log("Uploading main image...");
       mainImageUrl = await uploadImage(
         mainImageFile,
         `motorcycles/${vendorId}/main`,
       );
-      console.log("Main image URL:", mainImageUrl);
     }
 
     // Upload color images
@@ -120,7 +117,7 @@ export const addMotorcycle = async (
       colors: updatedColors,
       quantity: parseInt(motorcycle.quantity),
       images: motorcycle.images || [],
-      status: "available",
+      status: "available", // MUST be set to "available"
       created_at: new Date().toISOString(),
     };
 
@@ -137,23 +134,13 @@ export const addMotorcycle = async (
     }
     
     console.log("Motorcycle added successfully:", data);
-    
-    // Verify the motorcycle was added
-    const { data: checkData, error: checkError } = await supabase
-      .from("motorcycles")
-      .select("*")
-      .eq("vendor_id", vendorId)
-      .order("created_at", { ascending: false });
-    
-    console.log("All motorcycles for this vendor after insert:", checkData);
-    console.log("Check error:", checkError);
-    
     return data?.[0] || null;
   } catch (error) {
     console.error("Add error:", error);
     throw error;
   }
 };
+
 // Update motorcycle
 export const updateMotorcycle = async (id, updates) => {
   try {

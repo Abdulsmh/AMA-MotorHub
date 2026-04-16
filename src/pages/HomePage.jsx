@@ -25,14 +25,36 @@ const HomePage = () => {
       // Get all available motorcycles with vendor info
       const { data: bikes, error } = await supabase
         .from("motorcycles")
-        .select("*, users(shop_name, whatsapp, verified, priority)")
+        .select(
+          `
+        *,
+        users!motorcycles_vendor_id_fkey (
+          id,
+          shop_name,
+          shop_number,
+          whatsapp,
+          priority,
+          verified
+        )
+      `,
+        )
         .eq("status", "available")
         .gt("quantity", 0);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase error:", error);
+        throw error;
+      }
+
+      console.log("HomePage featured bikes loaded:", bikes?.length);
+
+      if (!bikes || bikes.length === 0) {
+        setFeaturedBikes([]);
+        return;
+      }
 
       // Sort by shop priority (higher first), then by creation date
-      const sortedBikes = (bikes || []).sort((a, b) => {
+      const sortedBikes = bikes.sort((a, b) => {
         const priorityA = a.users?.priority || 0;
         const priorityB = b.users?.priority || 0;
         if (priorityA !== priorityB) return priorityB - priorityA;
@@ -47,6 +69,7 @@ const HomePage = () => {
       setLoading(false);
     }
   };
+  
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat("en-NG").format(price);
