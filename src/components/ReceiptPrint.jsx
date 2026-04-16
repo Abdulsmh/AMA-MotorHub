@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { FiPrinter, FiDownload } from "react-icons/fi";
+import { FiPrinter, FiX } from "react-icons/fi";
 
 const ReceiptPrint = ({ receipt, onClose }) => {
   const printRef = useRef();
@@ -9,6 +9,7 @@ const ReceiptPrint = ({ receipt, onClose }) => {
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
     const date = new Date(dateString);
     return date.toLocaleString("en-NG", {
       day: "2-digit",
@@ -28,9 +29,7 @@ const ReceiptPrint = ({ receipt, onClose }) => {
     window.location.reload();
   };
 
-  const handleDownloadPDF = () => {
-    window.print();
-  };
+  if (!receipt) return null;
 
   return (
     <div
@@ -41,7 +40,6 @@ const ReceiptPrint = ({ receipt, onClose }) => {
         className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-100 p-4 flex justify-between items-center">
           <h2 className="text-lg font-semibold text-gray-800">Receipt</h2>
           <div className="flex gap-2">
@@ -66,10 +64,14 @@ const ReceiptPrint = ({ receipt, onClose }) => {
           {/* Shop Header */}
           <div className="text-center border-b border-gray-200 pb-4 mb-4">
             <h1 className="text-2xl font-bold text-gray-800">
-              {receipt.shopName}
+              {receipt.shop_name || "MotorHub"}
             </h1>
-            <p className="text-sm text-gray-500">{receipt.shopAddress}</p>
-            <p className="text-sm text-gray-500">Tel: {receipt.shopPhone}</p>
+            <p className="text-sm text-gray-500">
+              {receipt.shop_address || "Kano, Nigeria"}
+            </p>
+            <p className="text-sm text-gray-500">
+              Tel: {receipt.shop_phone || "N/A"}
+            </p>
           </div>
 
           {/* Receipt Info */}
@@ -77,17 +79,17 @@ const ReceiptPrint = ({ receipt, onClose }) => {
             <div>
               <p>
                 <span className="font-semibold">Receipt No:</span>{" "}
-                {receipt.receiptNumber}
+                {receipt.receipt_number}
               </p>
               <p>
                 <span className="font-semibold">Date:</span>{" "}
-                {formatDate(receipt.createdAt)}
+                {formatDate(receipt.created_at)}
               </p>
             </div>
             <div>
               <p>
                 <span className="font-semibold">Sold by:</span>{" "}
-                {receipt.shopName}
+                {receipt.shop_name}
               </p>
             </div>
           </div>
@@ -96,15 +98,15 @@ const ReceiptPrint = ({ receipt, onClose }) => {
           <div className="bg-gray-50 p-3 rounded-lg mb-4 text-sm">
             <p>
               <span className="font-semibold">Buyer Name:</span>{" "}
-              {receipt.buyerName}
+              {receipt.buyer_name}
             </p>
             <p>
               <span className="font-semibold">Buyer Phone:</span>{" "}
-              {receipt.buyerPhone}
+              {receipt.buyer_phone || "N/A"}
             </p>
             <p>
               <span className="font-semibold">Buyer Address:</span>{" "}
-              {receipt.buyerAddress}
+              {receipt.buyer_address || "N/A"}
             </p>
           </div>
 
@@ -121,18 +123,18 @@ const ReceiptPrint = ({ receipt, onClose }) => {
             <tbody>
               <tr className="border-b border-gray-100">
                 <td className="py-2">
-                  {receipt.motorcycleName}
+                  {receipt.motorcycle_name}
                   <br />
                   <span className="text-xs text-gray-500">
-                    {receipt.motorcycleBrand}
+                    {receipt.motorcycle_brand}
                   </span>
                 </td>
                 <td className="text-center py-2">{receipt.quantity}</td>
                 <td className="text-right py-2">
-                  ₦{formatPrice(receipt.unitPrice)}
+                  ₦{formatPrice(receipt.unit_price)}
                 </td>
                 <td className="text-right py-2 font-semibold">
-                  ₦{formatPrice(receipt.totalPrice)}
+                  ₦{formatPrice(receipt.total_price)}
                 </td>
               </tr>
             </tbody>
@@ -142,7 +144,7 @@ const ReceiptPrint = ({ receipt, onClose }) => {
                   Total:
                 </td>
                 <td className="text-right py-2 font-bold text-emerald-600">
-                  ₦{formatPrice(receipt.totalPrice)}
+                  ₦{formatPrice(receipt.total_price)}
                 </td>
               </tr>
             </tfoot>

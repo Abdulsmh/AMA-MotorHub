@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { getMotorcyclesByVendor } from "../services/motorcycleService";
+import { supabase } from "../lib/supabase";
 import { createReceipt } from "../services/receiptService";
 import { updateMotorcycle } from "../services/motorcycleService";
 import { FiX, FiSearch } from "react-icons/fi";
@@ -11,6 +11,7 @@ const NewReceiptForm = ({ onClose, onSuccess }) => {
   const [motorcycles, setMotorcycles] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBike, setSelectedBike] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     quantity: 1,
     buyerName: "",
@@ -19,24 +20,31 @@ const NewReceiptForm = ({ onClose, onSuccess }) => {
     paymentMethod: "cash",
   });
   const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const loadMotorcycles = () => {
-    const bikes = getMotorcyclesByVendor(user.id);
-    const availableBikes = bikes.filter(
-      (b) => b.status === "available" && b.quantity > 0,
-    );
-    setMotorcycles(availableBikes);
-  };
 
   useEffect(() => {
     loadMotorcycles();
   }, []);
 
+  const loadMotorcycles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("motorcycles")
+        .select("*")
+        .eq("vendor_id", user?.id)
+        .eq("status", "available")
+        .gt("quantity", 0);
+
+      if (error) throw error;
+      setMotorcycles(data || []);
+    } catch (error) {
+      console.error("Error loading motorcycles:", error);
+    }
+  };
+
   const filteredBikes = motorcycles.filter(
     (bike) =>
-      bike.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bike.brand.toLowerCase().includes(searchTerm.toLowerCase()),
+      bike.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      bike.brand?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const selectBike = (bike) => {
@@ -57,7 +65,7 @@ const NewReceiptForm = ({ onClose, onSuccess }) => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!selectedBike) {
@@ -71,40 +79,52 @@ const NewReceiptForm = ({ onClose, onSuccess }) => {
     }
 
     setLoading(true);
+    setMessage("");
 
-    // Create receipt
-    const receiptData = {
-      vendorId: user.id,
-      shopName: user.shopName,
-      shopAddress: user.shopAddress,
-      shopPhone: user.phone,
-      motorcycleId: selectedBike.id,
-      motorcycleName: selectedBike.name,
-      motorcycleBrand: selectedBike.brand,
-      quantity: formData.quantity,
-      unitPrice: selectedBike.price,
-      totalPrice: selectedBike.price * formData.quantity,
-      buyerName: formData.buyerName,
-      buyerPhone: formData.buyerPhone,
-      buyerAddress: formData.buyerAddress,
-      paymentMethod: formData.paymentMethod,
-    };
+    try {
+      // Create receipt
+      const receiptData = {
+        vendorId: user.id,
+        shopName: user.shopName,
+        shopAddress: user.shopAddress,
+        shopPhone: user.phone,
+        motorcycleId: selectedBike.id,
+        motorcycleName: selectedBike.name,
+        motorcycleBrand: selectedBike.brand,
+        quantity: formData.quantity,
+        unitPrice: selectedBike.price,
+        totalPrice: selectedBike.price * formData.quantity,
+        buyerName: formData.buyerName,
+        buyerPhone: formData.buyerPhone,
+        buyerAddress: formData.buyerAddress,
+        paymentMethod: formData.paymentMethod,
+      };
 
-    const receipt = createReceipt(receiptData);
+      const receipt = await createReceipt(receiptData);
 
-    // Update motorcycle stock
-    const newQuantity = selectedBike.quantity - formData.quantity;
-    const newStatus = newQuantity === 0 ? "sold" : "available";
-    updateMotorcycle(selectedBike.id, {
-      quantity: newQuantity,
-      status: newStatus,
-    });
+      // Update motorcycle stock
+      const newQuantity = selectedBike.quantity - formData.quantity;
+      const newStatus = newQuantity === 0 ? "sold" : "available";
 
-    setMessage("Receipt created successfully!");
-    setTimeout(() => {
-      onSuccess(receipt);
-    }, 1000);
-    setLoading(false);
+      await updateMotorcycle(selectedBike.id, {
+        quantity: newQuantity,
+        status: newStatus,
+      });
+
+      setMessage("Receipt created successfully!");
+      setTimeout(() => {
+        onSuccess(receipt);
+      }, 1000);
+    } catch (error) {
+      console.error("Error creating receipt:", error);
+      setMessage("Error creating receipt. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat("en-NG").format(price);
   };
 
   return (
@@ -165,7 +185,7 @@ const NewReceiptForm = ({ onClose, onSuccess }) => {
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-emerald-600">
-                          ₦{new Intl.NumberFormat("en-NG").format(bike.price)}
+                          ₦{formatPrice(bike.price)}
                         </p>
                       </div>
                     </button>
@@ -184,10 +204,7 @@ const NewReceiptForm = ({ onClose, onSuccess }) => {
                 </p>
                 <div className="flex justify-between mt-1">
                   <p className="text-sm font-bold text-emerald-600">
-                    ₦
-                    {new Intl.NumberFormat("en-NG").format(
-                      selectedBike?.price || 0,
-                    )}
+                    ₦{formatPrice(selectedBike?.price || 0)}
                   </p>
                   <p className="text-xs text-gray-500">
                     Available: {selectedBike?.quantity || 0}
@@ -277,7 +294,7 @@ const NewReceiptForm = ({ onClose, onSuccess }) => {
                   <span className="font-semibold">Total Amount:</span>
                   <span className="font-bold text-emerald-600">
                     ₦
-                    {new Intl.NumberFormat("en-NG").format(
+                    {formatPrice(
                       (selectedBike?.price || 0) * formData.quantity,
                     )}
                   </span>
