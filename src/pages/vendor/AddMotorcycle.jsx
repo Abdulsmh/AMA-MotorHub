@@ -129,29 +129,38 @@ const AddMotorcycle = () => {
     setCurrentStep(currentStep - 1);
     setMessage("");
   };
+const handleSubmit = (e) => {
+  e.preventDefault();
+  if (!validateStep()) return;
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!validateStep()) return;
+  // Debug: Check user data
+  console.log("Current user from AuthContext:", user);
+  console.log("User ID being used for motorcycle:", user?.id);
+  
+  if (!user || !user.id) {
+    setMessage("Error: You must be logged in to add a motorcycle");
+    setLoading(false);
+    return;
+  }
 
-    // Filter out empty color names
-    const validColors = formData.colors.filter((c) => c.name.trim() !== "");
-    if (validColors.length === 0) {
-      setMessage("Please add at least one color with a name");
-      return;
-    }
+  // Filter out empty color names
+  const validColors = formData.colors.filter((c) => c.name.trim() !== "");
+  if (validColors.length === 0) {
+    setMessage("Please add at least one color with a name");
+    return;
+  }
 
-    const finalData = {
-      ...formData,
-      colors: validColors,
-      price: parseInt(formData.price),
-      quantity: parseInt(formData.quantity),
-    };
+  const finalData = {
+    ...formData,
+    colors: validColors,
+    price: parseInt(formData.price),
+    quantity: parseInt(formData.quantity),
+  };
 
-    setLoading(true);
-    setMessage("");
+  setLoading(true);
+  setMessage("");
 
-    addMotorcycle(finalData, user.id, user.shopName);
+  addMotorcycle(finalData, user.id, user.shopName);
     setMessage("Motorcycle added successfully!");
     setTimeout(() => {
       navigate("/vendor/motorcycles");

@@ -34,15 +34,38 @@ export const getVendors = async () => {
 // Get user by phone (for login)
 export const getUserByPhone = async (phone) => {
   try {
+    console.log("getUserByPhone called with:", phone);
     const { data, error } = await supabase
       .from("users")
       .select("*")
       .eq("phone", phone)
       .maybeSingle();
-    if (error && error.code !== "PGRST116") throw error;
+
+    if (error && error.code !== "PGRST116") {
+      console.error("Supabase error in getUserByPhone:", error);
+      throw error;
+    }
+    console.log("getUserByPhone result:", data);
     return data;
   } catch (error) {
     console.error("Error in getUserByPhone:", error);
+    return null;
+  }
+};
+
+// Get user by ID
+export const getUserById = async (id) => {
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error && error.code !== "PGRST116") throw error;
+    return data;
+  } catch (error) {
+    console.error("Error in getUserById:", error);
     return null;
   }
 };
@@ -67,6 +90,8 @@ export const getPendingVendors = async () => {
 // Create new vendor
 export const createVendor = async (vendorData) => {
   try {
+    console.log("createVendor called with:", vendorData);
+
     // Check if phone already exists
     const { data: existing } = await supabase
       .from("users")
@@ -78,11 +103,14 @@ export const createVendor = async (vendorData) => {
       throw new Error("Phone number already registered");
     }
 
+    const vendorId = `vendor_${Date.now()}`;
+    console.log("Creating vendor with ID:", vendorId);
+
     const { data, error } = await supabase
       .from("users")
       .insert([
         {
-          id: `vendor_${Date.now()}`,
+          id: vendorId,
           full_name: vendorData.fullName,
           phone: vendorData.phone,
           whatsapp: vendorData.whatsapp,
@@ -106,6 +134,7 @@ export const createVendor = async (vendorData) => {
       console.error("Supabase insert error:", error);
       throw error;
     }
+    console.log("Vendor created successfully:", data);
     return data?.[0] || null;
   } catch (error) {
     console.error("Error in createVendor:", error);
@@ -116,6 +145,7 @@ export const createVendor = async (vendorData) => {
 // Update vendor
 export const updateVendor = async (id, updates) => {
   try {
+    console.log("Updating vendor:", id, updates);
     const { data, error } = await supabase
       .from("users")
       .update(updates)
@@ -148,12 +178,14 @@ export const updateVendorPriority = async (id, priority) => {
 // Verify vendor
 export const verifyVendor = async (id) => {
   try {
+    console.log("Verifying vendor:", id);
     const { data, error } = await supabase
       .from("users")
       .update({ verified: true })
       .eq("id", id)
       .select();
     if (error) throw error;
+    console.log("Vendor verified:", data);
     return data?.[0] || null;
   } catch (error) {
     console.error("Error in verifyVendor:", error);
@@ -164,12 +196,20 @@ export const verifyVendor = async (id) => {
 // Delete vendor
 export const deleteVendor = async (id) => {
   try {
+    console.log("Deleting vendor:", id);
     // First delete their motorcycles
-    await supabase.from("motorcycles").delete().eq("vendor_id", id);
+    const { error: bikesError } = await supabase
+      .from("motorcycles")
+      .delete()
+      .eq("vendor_id", id);
+
+    if (bikesError)
+      console.error("Error deleting vendor's motorcycles:", bikesError);
 
     // Then delete the vendor
     const { error } = await supabase.from("users").delete().eq("id", id);
     if (error) throw error;
+    console.log("Vendor deleted successfully");
     return true;
   } catch (error) {
     console.error("Error in deleteVendor:", error);

@@ -20,6 +20,7 @@ export const AuthProvider = ({ children }) => {
     if (storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser);
+        console.log("Loaded stored user:", parsedUser);
         setUser(parsedUser);
         setIsAuthenticated(true);
         setUserType(parsedUser.type);
@@ -57,6 +58,8 @@ export const AuthProvider = ({ children }) => {
     if (supabase) {
       try {
         const vendor = await getUserByPhone(identifier);
+        console.log("Vendor found in Supabase:", vendor);
+
         if (vendor && vendor.type === "vendor") {
           // Check if vendor is verified
           if (!vendor.verified) {
@@ -68,9 +71,11 @@ export const AuthProvider = ({ children }) => {
           }
 
           const isPasswordValid = bcrypt.compareSync(password, vendor.password);
+          console.log("Password valid:", isPasswordValid);
+
           if (isPasswordValid) {
             const vendorUser = {
-              id: vendor.id,
+              id: vendor.id, // This is the CORRECT Supabase user ID
               name: vendor.full_name,
               phone: vendor.phone,
               shopName: vendor.shop_name,
@@ -85,6 +90,7 @@ export const AuthProvider = ({ children }) => {
               role: "vendor",
               verified: vendor.verified,
             };
+            console.log("Setting vendor user in localStorage:", vendorUser);
             localStorage.setItem(
               "motorcycle_current_user",
               JSON.stringify(vendorUser),
@@ -120,6 +126,8 @@ export const AuthProvider = ({ children }) => {
         password: hashedPassword,
         verified: false,
       });
+
+      console.log("New vendor created:", newUser);
 
       // Return success with message - user will be redirected to login
       return {
