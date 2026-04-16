@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { getAnnouncements } from "../../services/announcementService";
+import { supabase } from "../../lib/supabase";
 import { FiBell, FiCalendar, FiCheckCircle, FiCircle } from "react-icons/fi";
 
 const Announcements = () => {
@@ -8,15 +8,28 @@ const Announcements = () => {
   const [announcements, setAnnouncements] = useState([]);
   const [filter, setFilter] = useState("all");
   const [readStatus, setReadStatus] = useState({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadAnnouncements();
     loadReadStatus();
   }, []);
 
-  const loadAnnouncements = () => {
-    const allAnnouncements = getAnnouncements();
-    setAnnouncements(allAnnouncements);
+  const loadAnnouncements = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("announcements")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setAnnouncements(data || []);
+    } catch (error) {
+      console.error("Error loading announcements:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loadReadStatus = () => {
@@ -84,9 +97,16 @@ const Announcements = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-gray-500">Loading announcements...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="px-3 sm:px-4 md:px-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">
         <div className="flex items-center gap-2">
           <h1 className="text-base sm:text-lg md:text-xl font-bold text-gray-800">
@@ -108,41 +128,27 @@ const Announcements = () => {
         )}
       </div>
 
-      {/* Filter Tabs */}
       <div className="flex gap-2 mb-4 border-b border-gray-100">
         <button
           onClick={() => setFilter("all")}
-          className={`px-3 py-2 text-sm transition ${
-            filter === "all"
-              ? "text-emerald-600 border-b-2 border-emerald-600 font-medium"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
+          className={`px-3 py-2 text-sm transition ${filter === "all" ? "text-emerald-600 border-b-2 border-emerald-600 font-medium" : "text-gray-500 hover:text-gray-700"}`}
         >
           All
         </button>
         <button
           onClick={() => setFilter("unread")}
-          className={`px-3 py-2 text-sm transition ${
-            filter === "unread"
-              ? "text-emerald-600 border-b-2 border-emerald-600 font-medium"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
+          className={`px-3 py-2 text-sm transition ${filter === "unread" ? "text-emerald-600 border-b-2 border-emerald-600 font-medium" : "text-gray-500 hover:text-gray-700"}`}
         >
           Unread
         </button>
         <button
           onClick={() => setFilter("read")}
-          className={`px-3 py-2 text-sm transition ${
-            filter === "read"
-              ? "text-emerald-600 border-b-2 border-emerald-600 font-medium"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
+          className={`px-3 py-2 text-sm transition ${filter === "read" ? "text-emerald-600 border-b-2 border-emerald-600 font-medium" : "text-gray-500 hover:text-gray-700"}`}
         >
           Read
         </button>
       </div>
 
-      {/* Announcements List */}
       {filteredAnnouncements.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
           <FiBell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -153,11 +159,7 @@ const Announcements = () => {
           {filteredAnnouncements.map((announcement) => (
             <div
               key={announcement.id}
-              className={`bg-white rounded-lg border p-4 transition ${
-                !readStatus[announcement.id]
-                  ? "border-l-4 border-l-emerald-500 bg-emerald-50/30"
-                  : "border-gray-100"
-              }`}
+              className={`bg-white rounded-lg border p-4 transition ${!readStatus[announcement.id] ? "border-l-4 border-l-emerald-500 bg-emerald-50/30" : "border-gray-100"}`}
               onClick={() =>
                 !readStatus[announcement.id] && markAsRead(announcement.id)
               }
@@ -190,7 +192,7 @@ const Announcements = () => {
                   <div className="flex items-center gap-3 text-xs text-gray-400">
                     <span className="flex items-center gap-1">
                       <FiCalendar className="w-3 h-3" />
-                      {formatDate(announcement.date)}
+                      {formatDate(announcement.created_at)}
                     </span>
                   </div>
                 </div>

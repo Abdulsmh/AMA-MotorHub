@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { supabase } from "../../lib/supabase";
 import {
   FiUser,
   FiBriefcase,
@@ -48,9 +49,8 @@ const VendorSettings = () => {
       }
       const reader = new FileReader();
       reader.onloadend = () => {
-        const imageData = reader.result;
-        setProfilePreview(imageData);
-        setProfilePicture(imageData);
+        setProfilePreview(reader.result);
+        setProfilePicture(reader.result);
       };
       reader.readAsDataURL(file);
     }
@@ -67,17 +67,36 @@ const VendorSettings = () => {
     setMessage("");
 
     try {
-      const updatedData = {
+      // Update user in Supabase
+      const { error } = await supabase
+        .from("users")
+        .update({
+          full_name: formData.fullName,
+          phone: formData.phone,
+          whatsapp: formData.whatsapp,
+          email: formData.email,
+          shop_name: formData.shopName,
+          shop_number: formData.shopNumber,
+          shop_address: formData.shopAddress,
+          profile_picture: profilePicture,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
+
+      if (error) throw error;
+
+      // Update local user state
+      const updatedUser = {
+        ...user,
         ...formData,
-        profilePicture: profilePicture,
+        profilePicture,
         name: formData.fullName,
       };
-
-      // Update the user context
-      updateUser(updatedData);
+      updateUser(updatedUser);
 
       setMessage("Settings saved successfully!");
     } catch (error) {
+      console.error("Error saving settings:", error);
       setMessage("Error saving settings");
     } finally {
       setLoading(false);
@@ -121,8 +140,7 @@ const VendorSettings = () => {
             </div>
             <div>
               <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition">
-                <FiCamera className="w-4 h-4" />
-                Upload Photo
+                <FiCamera className="w-4 h-4" /> Upload Photo
                 <input
                   type="file"
                   accept="image/*"
@@ -145,46 +163,37 @@ const VendorSettings = () => {
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Shop Name
               </label>
-              <div className="relative">
-                <FiBriefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
-                  name="shopName"
-                  value={formData.shopName}
-                  onChange={handleChange}
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg"
-                />
-              </div>
+              <input
+                type="text"
+                name="shopName"
+                value={formData.shopName}
+                onChange={handleChange}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Shop Number
               </label>
-              <div className="relative">
-                <FiBriefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
-                  name="shopNumber"
-                  value={formData.shopNumber}
-                  onChange={handleChange}
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg"
-                />
-              </div>
+              <input
+                type="text"
+                name="shopNumber"
+                value={formData.shopNumber}
+                onChange={handleChange}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Shop Address
               </label>
-              <div className="relative">
-                <FiMapPin className="absolute left-3 top-3 text-gray-400 w-4 h-4" />
-                <textarea
-                  name="shopAddress"
-                  value={formData.shopAddress}
-                  onChange={handleChange}
-                  rows="2"
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg"
-                />
-              </div>
+              <textarea
+                name="shopAddress"
+                value={formData.shopAddress}
+                onChange={handleChange}
+                rows="2"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
+              />
             </div>
           </div>
         </div>
@@ -199,66 +208,53 @@ const VendorSettings = () => {
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Owner Name
               </label>
-              <div className="relative">
-                <FiUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
-                  name="fullName"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg"
-                />
-              </div>
+              <input
+                type="text"
+                name="fullName"
+                value={formData.fullName}
+                onChange={handleChange}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Phone Number
               </label>
-              <div className="relative">
-                <FiPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="tel"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg"
-                />
-              </div>
+              <input
+                type="tel"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 WhatsApp Number
               </label>
-              <div className="relative">
-                <FiPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="tel"
-                  name="whatsapp"
-                  value={formData.whatsapp}
-                  onChange={handleChange}
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg"
-                />
-              </div>
+              <input
+                type="tel"
+                name="whatsapp"
+                value={formData.whatsapp}
+                onChange={handleChange}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Email Address
               </label>
-              <div className="relative">
-                <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg"
-                />
-              </div>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
+              />
             </div>
           </div>
         </div>
 
-        {/* Message */}
         {message && (
           <div
             className={`p-3 rounded-lg text-sm ${message.includes("success") ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"}`}
@@ -267,7 +263,6 @@ const VendorSettings = () => {
           </div>
         )}
 
-        {/* Submit Button */}
         <button
           type="submit"
           disabled={loading}

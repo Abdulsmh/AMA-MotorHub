@@ -22,8 +22,7 @@ const Marketplace = () => {
     try {
       setLoading(true);
 
-      // Get all available motorcycles from other vendors (excluding current vendor)
-      // For marketplace, we'll show all available bikes
+      // Get all available motorcycles
       const { data: bikes, error: bikesError } = await supabase
         .from("motorcycles")
         .select("*")
@@ -104,7 +103,6 @@ const Marketplace = () => {
 
   return (
     <div className="px-3 sm:px-4 md:px-6">
-      {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Marketplace</h1>
         <p className="text-gray-500 text-sm">
@@ -112,7 +110,6 @@ const Marketplace = () => {
         </p>
       </div>
 
-      {/* Search Bar */}
       <div className="relative mb-6">
         <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
         <input
@@ -124,13 +121,11 @@ const Marketplace = () => {
         />
       </div>
 
-      {/* Results Count */}
       <div className="text-xs text-gray-500 mb-3">
         {filteredBikes.length} motorcycle{filteredBikes.length !== 1 ? "s" : ""}{" "}
         available
       </div>
 
-      {/* Motorcycle Grid */}
       {filteredBikes.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
           <p className="text-gray-500">No motorcycles available</p>
@@ -143,7 +138,6 @@ const Marketplace = () => {
               to={`/shop/${bike.vendor_id}`}
               className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition group"
             >
-              {/* Image */}
               <div className="aspect-square bg-gray-100">
                 {bike.images && bike.images[0] ? (
                   <img
@@ -157,14 +151,11 @@ const Marketplace = () => {
                   </div>
                 )}
               </div>
-
-              {/* Content */}
               <div className="p-3">
                 <div className="flex items-start justify-between gap-1">
                   <h3 className="font-semibold text-gray-800 text-sm truncate flex-1">
                     {bike.name}
                   </h3>
-                  {/* Verified Badge */}
                   {bike.shopVerified && (
                     <span className="inline-flex items-center gap-0.5 text-[9px] bg-blue-50 text-blue-600 px-1 py-0.5 rounded-full flex-shrink-0">
                       <FiCheckCircle className="w-2 h-2" />
@@ -182,17 +173,11 @@ const Marketplace = () => {
                 </p>
                 <div className="mt-2 flex justify-between items-center">
                   <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                      bike.status === "available"
-                        ? bike.quantity <= 3
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
-                    }`}
+                    className={`text-[10px] px-1.5 py-0.5 rounded-full ${bike.status === "available" ? (bike.quantity <= 3 ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700") : "bg-red-100 text-red-700"}`}
                   >
                     {bike.status === "available"
                       ? bike.quantity <= 3
-                        ? `Low Stock`
+                        ? "Low Stock"
                         : "In Stock"
                       : "Sold"}
                   </span>

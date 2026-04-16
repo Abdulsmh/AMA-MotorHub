@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { getReceiptsByVendor } from "../../services/receiptService";
+import { supabase } from "../../lib/supabase";
 import NewReceiptForm from "../../components/NewReceiptForm";
 import ReceiptPrint from "../../components/ReceiptPrint";
 import { FiSearch, FiPrinter, FiPlus, FiEye } from "react-icons/fi";
@@ -11,21 +11,35 @@ const Sales = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewReceipt, setShowNewReceipt] = useState(false);
   const [viewingReceipt, setViewingReceipt] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadSales();
   }, []);
 
-  const loadSales = () => {
-    const receipts = getReceiptsByVendor(user.id);
-    setSales(receipts);
+  const loadSales = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("receipts")
+        .select("*")
+        .eq("vendor_id", user?.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setSales(data || []);
+    } catch (error) {
+      console.error("Error loading sales:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredSales = sales.filter(
     (s) =>
-      s.motorcycleName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.buyerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.receiptNumber?.toLowerCase().includes(searchTerm.toLowerCase()),
+      s.motorcycle_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.buyer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.receipt_number?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const formatPrice = (price) => {
@@ -33,6 +47,7 @@ const Sales = () => {
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
     const date = new Date(dateString);
     return date.toLocaleDateString("en-NG", {
       day: "2-digit",
@@ -41,15 +56,21 @@ const Sales = () => {
     });
   };
 
-  const handleReceiptSuccess = (receipt) => {
+  const handleReceiptSuccess = () => {
     setShowNewReceipt(false);
     loadSales();
-    setViewingReceipt(receipt);
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-gray-500">Loading sales...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="px-3 sm:px-4 md:px-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">
         <h1 className="text-base sm:text-lg md:text-xl font-bold text-gray-800">
           Sales History
@@ -63,7 +84,6 @@ const Sales = () => {
         </button>
       </div>
 
-      {/* Search Bar */}
       <div className="relative mb-4">
         <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5 sm:w-4 sm:h-4" />
         <input
@@ -75,14 +95,12 @@ const Sales = () => {
         />
       </div>
 
-      {/* Results Count */}
       <div className="text-xs text-gray-500 mb-3">
         {filteredSales.length} sale{filteredSales.length !== 1 ? "s" : ""} found
       </div>
 
       {filteredSales.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
-          <FiSearch className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-3" />
           <p className="text-sm text-gray-500">No sales records found</p>
           <button
             onClick={() => setShowNewReceipt(true)}
@@ -99,32 +117,30 @@ const Sales = () => {
               className="bg-white rounded-lg border border-gray-100 p-3 sm:p-4"
             >
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
-                {/* Left - Sale Info */}
                 <div className="flex-1">
                   <h3 className="font-semibold text-gray-800 text-sm sm:text-base">
-                    {sale.motorcycleName}
+                    {sale.motorcycle_name}
                   </h3>
                   <p className="text-xs text-gray-500 mt-1">
-                    <span className="font-medium">Buyer:</span> {sale.buyerName}
+                    <span className="font-medium">Buyer:</span>{" "}
+                    {sale.buyer_name}
                   </p>
                   <p className="text-xs text-gray-500">
                     <span className="font-medium">Phone:</span>{" "}
-                    {sale.buyerPhone || "N/A"}
+                    {sale.buyer_phone || "N/A"}
                   </p>
                   <p className="text-xs text-gray-500">
                     <span className="font-medium">Receipt:</span>{" "}
-                    {sale.receiptNumber}
+                    {sale.receipt_number}
                   </p>
                 </div>
-
-                {/* Right - Price & Actions */}
                 <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between gap-3">
                   <div className="text-right">
                     <p className="text-[10px] sm:text-xs text-gray-400">
                       Total Amount
                     </p>
                     <p className="text-base sm:text-lg font-bold text-emerald-600">
-                      ₦{formatPrice(sale.totalPrice)}
+                      ₦{formatPrice(sale.total_price)}
                     </p>
                     <p className="text-[10px] text-gray-400">
                       Qty: {sale.quantity}
@@ -135,27 +151,25 @@ const Sales = () => {
                       onClick={() => setViewingReceipt(sale)}
                       className="flex items-center gap-1 px-2 py-1.5 text-xs text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition"
                     >
-                      <FiEye className="w-3 h-3" />
+                      <FiEye className="w-3 h-3" />{" "}
                       <span className="hidden sm:inline">View</span>
                     </button>
                     <button
                       onClick={() => setViewingReceipt(sale)}
                       className="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
                     >
-                      <FiPrinter className="w-3 h-3" />
+                      <FiPrinter className="w-3 h-3" />{" "}
                       <span className="hidden sm:inline">Print</span>
                     </button>
                   </div>
                 </div>
               </div>
-
-              {/* Date */}
               <div className="mt-2 pt-2 border-t border-gray-100">
                 <p className="text-[10px] text-gray-400">
-                  Sold on: {formatDate(sale.createdAt)}
+                  Sold on: {formatDate(sale.created_at)}
                 </p>
                 <p className="text-[10px] text-gray-400">
-                  Payment: {sale.paymentMethod || "cash"}
+                  Payment: {sale.payment_method || "cash"}
                 </p>
               </div>
             </div>
@@ -163,7 +177,6 @@ const Sales = () => {
         </div>
       )}
 
-      {/* New Receipt Modal */}
       {showNewReceipt && (
         <NewReceiptForm
           onClose={() => setShowNewReceipt(false)}
@@ -171,7 +184,6 @@ const Sales = () => {
         />
       )}
 
-      {/* View Receipt Modal */}
       {viewingReceipt && (
         <ReceiptPrint
           receipt={viewingReceipt}

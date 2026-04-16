@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { getMotorcyclesByVendor } from "../../services/motorcycleService";
-import { getReceiptsByVendor } from "../../services/receiptService";
+import { supabase } from "../../lib/supabase";
 import {
   FiPackage,
   FiAlertCircle,
@@ -33,74 +32,84 @@ const VendorDashboard = () => {
     loadDashboardData();
   }, []);
 
-  const loadDashboardData = () => {
-    // Get vendor's motorcycles
-    const bikes = getMotorcyclesByVendor(user?.id);
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
 
-    // Calculate stats
-    const total = bikes.length;
-    const lowStock = bikes.filter(
-      (b) => b.status === "available" && b.quantity <= 3 && b.quantity > 0,
-    ).length;
-    const lowStockList = bikes.filter(
-      (b) => b.status === "available" && b.quantity <= 3 && b.quantity > 0,
-    );
+      // Get vendor's motorcycles
+      const { data: bikes, error: bikesError } = await supabase
+        .from("motorcycles")
+        .select("*")
+        .eq("vendor_id", user?.id);
 
-    // Get sales
-    const receipts = getReceiptsByVendor(user?.id);
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
+      if (bikesError) throw bikesError;
 
-    const monthlySales = receipts.filter((r) => {
-      const saleDate = new Date(r.createdAt);
-      return (
-        saleDate.getMonth() === currentMonth &&
-        saleDate.getFullYear() === currentYear
+      // Calculate stats
+      const total = bikes?.length || 0;
+      const lowStock =
+        bikes?.filter(
+          (b) => b.status === "available" && b.quantity <= 3 && b.quantity > 0,
+        ).length || 0;
+      const lowStockList =
+        bikes?.filter(
+          (b) => b.status === "available" && b.quantity <= 3 && b.quantity > 0,
+        ) || [];
+
+      // Get sales/receipts
+      const { data: receipts, error: receiptsError } = await supabase
+        .from("receipts")
+        .select("*")
+        .eq("vendor_id", user?.id);
+
+      if (receiptsError) throw receiptsError;
+
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+
+      const monthlySales =
+        receipts?.filter((r) => {
+          const saleDate = new Date(r.created_at);
+          return (
+            saleDate.getMonth() === currentMonth &&
+            saleDate.getFullYear() === currentYear
+          );
+        }) || [];
+
+      const soldThisMonth = monthlySales.reduce(
+        (sum, sale) => sum + (sale.quantity || 0),
+        0,
       );
-    });
+      const totalRevenue =
+        receipts?.reduce((sum, sale) => sum + (sale.total_price || 0), 0) || 0;
 
-    const soldThisMonth = monthlySales.reduce(
-      (sum, sale) => sum + sale.quantity,
-      0,
-    );
-    const totalRevenue = receipts.reduce(
-      (sum, sale) => sum + sale.totalPrice,
-      0,
-    );
+      // Get recent sales (last 5)
+      const recent = [...(receipts || [])]
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .slice(0, 5);
 
-    // Get recent sales (last 5)
-    const recent = [...receipts]
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .slice(0, 5);
+      // Get announcements
+      const { data: announcements, error: announcementsError } = await supabase
+        .from("announcements")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(3);
 
-    // Sample announcements
-    const announcements = [
-      {
-        id: 1,
-        title: "New Price List Available",
-        message: "Latest prices updated",
-        date: new Date().toISOString(),
-        type: "price_update",
-      },
-      {
-        id: 2,
-        title: "Marketplace Update",
-        message: "New features added",
-        date: new Date(Date.now() - 86400000).toISOString(),
-        type: "feature",
-      },
-    ];
+      if (announcementsError) throw announcementsError;
 
-    setStats({
-      totalMotorcycles: total,
-      lowStockItems: lowStock,
-      soldThisMonth: soldThisMonth,
-      totalRevenue: totalRevenue,
-    });
-    setRecentSales(recent);
-    setRecentAnnouncements(announcements);
-    setLowStockBikes(lowStockList);
-    setLoading(false);
+      setStats({
+        totalMotorcycles: total,
+        lowStockItems: lowStock,
+        soldThisMonth: soldThisMonth,
+        totalRevenue: totalRevenue,
+      });
+      setRecentSales(recent);
+      setRecentAnnouncements(announcements || []);
+      setLowStockBikes(lowStockList);
+    } catch (error) {
+      console.error("Error loading dashboard:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const formatPrice = (price) => {
@@ -108,6 +117,7 @@ const VendorDashboard = () => {
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now - date;
@@ -221,8 +231,7 @@ const VendorDashboard = () => {
             to="/vendor/motorcycles"
             className="text-xs text-yellow-700 hover:text-yellow-800 font-medium flex items-center gap-1"
           >
-            View Inventory
-            <FiArrowRight className="w-3 h-3" />
+            View Inventory <FiArrowRight className="w-3 h-3" />
           </Link>
         </div>
       )}
@@ -295,7 +304,7 @@ const VendorDashboard = () => {
                     {announcement.message}
                   </p>
                   <p className="text-[9px] text-gray-400 mt-1">
-                    {formatDate(announcement.date)}
+                    {formatDate(announcement.created_at)}
                   </p>
                 </div>
               </div>
@@ -358,22 +367,22 @@ const VendorDashboard = () => {
                     <tr key={sale.id} className="hover:bg-gray-50">
                       <td className="px-3 sm:px-4 py-2">
                         <p className="text-xs font-medium text-gray-800 truncate max-w-[120px] sm:max-w-none">
-                          {sale.motorcycleName}
+                          {sale.motorcycle_name}
                         </p>
                       </td>
                       <td className="px-3 sm:px-4 py-2">
                         <p className="text-xs text-gray-600 truncate max-w-[100px] sm:max-w-none">
-                          {sale.buyerName}
+                          {sale.buyer_name}
                         </p>
                       </td>
                       <td className="px-3 sm:px-4 py-2 text-right">
                         <p className="text-xs font-semibold text-emerald-600">
-                          ₦{formatPrice(sale.totalPrice)}
+                          ₦{formatPrice(sale.total_price)}
                         </p>
                       </td>
                       <td className="px-3 sm:px-4 py-2 text-right">
                         <p className="text-[10px] text-gray-500">
-                          {formatDate(sale.createdAt)}
+                          {formatDate(sale.created_at)}
                         </p>
                       </td>
                     </tr>
@@ -384,6 +393,42 @@ const VendorDashboard = () => {
           )}
         </div>
       </div>
+
+      {/* Low Stock Items Section */}
+      {lowStockBikes.length > 0 && (
+        <div className="mt-5">
+          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+            <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-100 bg-yellow-50">
+              <h2 className="text-sm font-semibold text-yellow-800">
+                Low Stock Items
+              </h2>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {lowStockBikes.slice(0, 3).map((bike) => (
+                <div
+                  key={bike.id}
+                  className="px-4 sm:px-5 py-3 flex justify-between items-center"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">
+                      {bike.name}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Stock: {bike.quantity} units left
+                    </p>
+                  </div>
+                  <Link
+                    to="/vendor/motorcycles"
+                    className="text-xs text-emerald-600 hover:text-emerald-700"
+                  >
+                    Restock
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Export Button */}
       <div className="mt-5 flex justify-end">
