@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { FiPlus, FiTrash2, FiEdit2, FiSend } from "react-icons/fi";
+import {
+  getAnnouncements,
+  addAnnouncement,
+  updateAnnouncement,
+  deleteAnnouncement,
+} from "../../services/announcementService";
 
 const AdminAnnouncements = () => {
   const [announcements, setAnnouncements] = useState([]);
@@ -17,61 +23,41 @@ const AdminAnnouncements = () => {
   }, []);
 
   const loadAnnouncements = () => {
-    const stored = localStorage.getItem("admin_announcements");
-    const announcementsList = stored
-      ? JSON.parse(stored)
-      : [
-          {
-            id: 1,
-            title: "Welcome to MotorHub",
-            message: "Welcome to our platform! We are excited to have you.",
-            type: "announcement",
-            date: new Date().toISOString(),
-          },
-        ];
+    const announcementsList = getAnnouncements();
     setAnnouncements(announcementsList);
     setLoading(false);
-  };
-
-  const saveAnnouncements = (newList) => {
-    localStorage.setItem("admin_announcements", JSON.stringify(newList));
-    setAnnouncements(newList);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
 
     if (editingId) {
-      const updated = announcements.map((a) =>
-        a.id === editingId
-          ? { ...a, ...formData, date: new Date().toISOString() }
-          : a,
+      updateAnnouncement(
+        editingId,
+        formData.title,
+        formData.message,
+        formData.type,
       );
-      saveAnnouncements(updated);
       alert("Announcement updated!");
     } else {
-      const newAnnouncement = {
-        id: Date.now(),
-        ...formData,
-        date: new Date().toISOString(),
-      };
-      saveAnnouncements([newAnnouncement, ...announcements]);
+      addAnnouncement(formData.title, formData.message, formData.type);
       alert("Announcement posted!");
     }
 
+    loadAnnouncements();
     setShowForm(false);
     setEditingId(null);
     setFormData({ title: "", message: "", type: "announcement" });
   };
 
-  const deleteAnnouncement = (id) => {
+  const handleDelete = (id) => {
     if (window.confirm("Delete this announcement?")) {
-      const filtered = announcements.filter((a) => a.id !== id);
-      saveAnnouncements(filtered);
+      deleteAnnouncement(id);
+      loadAnnouncements();
     }
   };
 
-  const editAnnouncement = (announcement) => {
+  const handleEdit = (announcement) => {
     setFormData({
       title: announcement.title,
       message: announcement.message,
@@ -241,13 +227,13 @@ const AdminAnnouncements = () => {
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => editAnnouncement(announcement)}
+                    onClick={() => handleEdit(announcement)}
                     className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition"
                   >
                     <FiEdit2 className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => deleteAnnouncement(announcement.id)}
+                    onClick={() => handleDelete(announcement.id)}
                     className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition"
                   >
                     <FiTrash2 className="w-4 h-4" />

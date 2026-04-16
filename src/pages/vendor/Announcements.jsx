@@ -1,74 +1,61 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { getAnnouncements } from "../../services/announcementService";
 import { FiBell, FiCalendar, FiCheckCircle, FiCircle } from "react-icons/fi";
-
-// Sample announcements - in production, these would come from admin
-const sampleAnnouncements = [
-  {
-    id: 1,
-    title: "New Price List Available",
-    message:
-      "Latest price list for all motorcycle brands has been updated. Check the Price List page for details.",
-    date: "2024-01-15T10:30:00Z",
-    isRead: false,
-    type: "price_update",
-  },
-  {
-    id: 2,
-    title: "Marketplace Maintenance",
-    message:
-      "The marketplace will be under maintenance on Sunday, Jan 20th from 2AM to 4AM. Please plan accordingly.",
-    date: "2024-01-14T09:00:00Z",
-    isRead: true,
-    type: "maintenance",
-  },
-  {
-    id: 3,
-    title: "New Feature: Digital Receipts",
-    message:
-      "You can now generate digital receipts for your customers. Go to Sales section to try it out!",
-    date: "2024-01-10T14:15:00Z",
-    isRead: false,
-    type: "feature",
-  },
-  {
-    id: 4,
-    title: "Holiday Schedule",
-    message:
-      "Our platform will have limited support during the upcoming holidays. Please expect delayed responses.",
-    date: "2024-01-05T08:00:00Z",
-    isRead: true,
-    type: "announcement",
-  },
-];
 
 const Announcements = () => {
   const { user } = useAuth();
   const [announcements, setAnnouncements] = useState([]);
-  const [filter, setFilter] = useState("all"); // all, unread, read
+  const [filter, setFilter] = useState("all");
+  const [readStatus, setReadStatus] = useState({});
 
   useEffect(() => {
-    // Load announcements (in production, fetch from API)
-    setAnnouncements(sampleAnnouncements);
+    loadAnnouncements();
+    loadReadStatus();
   }, []);
 
-  const markAsRead = (id) => {
-    setAnnouncements((prev) =>
-      prev.map((ann) => (ann.id === id ? { ...ann, isRead: true } : ann)),
+  const loadAnnouncements = () => {
+    const allAnnouncements = getAnnouncements();
+    setAnnouncements(allAnnouncements);
+  };
+
+  const loadReadStatus = () => {
+    const stored = localStorage.getItem(
+      `vendor_read_announcements_${user?.id}`,
+    );
+    if (stored) {
+      setReadStatus(JSON.parse(stored));
+    }
+  };
+
+  const saveReadStatus = (newStatus) => {
+    setReadStatus(newStatus);
+    localStorage.setItem(
+      `vendor_read_announcements_${user?.id}`,
+      JSON.stringify(newStatus),
     );
   };
 
+  const markAsRead = (id) => {
+    const newStatus = { ...readStatus, [id]: true };
+    saveReadStatus(newStatus);
+  };
+
   const markAllAsRead = () => {
-    setAnnouncements((prev) => prev.map((ann) => ({ ...ann, isRead: true })));
+    const newStatus = {};
+    announcements.forEach((a) => {
+      newStatus[a.id] = true;
+    });
+    saveReadStatus(newStatus);
   };
 
   const filteredAnnouncements = announcements.filter((ann) => {
-    if (filter === "unread") return !ann.isRead;
-    if (filter === "read") return ann.isRead;
+    if (filter === "unread") return !readStatus[ann.id];
+    if (filter === "read") return readStatus[ann.id];
     return true;
   });
 
-  const unreadCount = announcements.filter((a) => !a.isRead).length;
+  const unreadCount = announcements.filter((a) => !readStatus[a.id]).length;
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -167,17 +154,17 @@ const Announcements = () => {
             <div
               key={announcement.id}
               className={`bg-white rounded-lg border p-4 transition ${
-                !announcement.isRead
+                !readStatus[announcement.id]
                   ? "border-l-4 border-l-emerald-500 bg-emerald-50/30"
                   : "border-gray-100"
               }`}
               onClick={() =>
-                !announcement.isRead && markAsRead(announcement.id)
+                !readStatus[announcement.id] && markAsRead(announcement.id)
               }
             >
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 mt-1">
-                  {!announcement.isRead ? (
+                  {!readStatus[announcement.id] ? (
                     <FiCircle className="w-4 h-4 text-emerald-500" />
                   ) : (
                     <FiCheckCircle className="w-4 h-4 text-gray-300" />
@@ -191,7 +178,7 @@ const Announcements = () => {
                     <h3 className="font-semibold text-gray-800 text-sm sm:text-base">
                       {announcement.title}
                     </h3>
-                    {!announcement.isRead && (
+                    {!readStatus[announcement.id] && (
                       <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] rounded-full">
                         New
                       </span>

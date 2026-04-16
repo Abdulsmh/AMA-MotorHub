@@ -1,80 +1,154 @@
-//i'm using localStorage for Motorcycle data management
+import { supabase } from "../lib/supabase";
 
-const STORAGE_KEY = "motorcycle_marketplace";
-
-// to get all motorcycles
-export const getAllMotorcycles = () => {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  return stored ? JSON.parse(stored) : [];
-};
-
-// to save all motorcycles
-const saveMotorcycles = (motorcycles) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(motorcycles));
-};
-
-// to get motorcycles by vendor
-export const getMotorcyclesByVendor = (vendorId) => {
-  const all = getAllMotorcycles();
-  return all.filter((m) => m.vendorId === vendorId);
-};
-
-// to get all available motorcycles (for marketplace)
-export const getAvailableMotorcycles = () => {
-  const all = getAllMotorcycles();
-  return all.filter((m) => m.status === "available" && m.quantity > 0);
-};
-
-//to Add motorcycle
-export const addMotorcycle = (motorcycle, vendorId, shopName) => {
-  const motorcycles = getAllMotorcycles();
-  const newMotorcycle = {
-    id: `moto_${Date.now()}`,
-    vendorId,
-    shopName,
-    ...motorcycle,
-    status: "available",
-    createdAt: new Date().toISOString(),
-    soldAt: null,
-    buyer: null,
-  };
-  motorcycles.push(newMotorcycle);
-  saveMotorcycles(motorcycles);
-  return newMotorcycle;
-};
-
-//to Update motorcycle
-export const updateMotorcycle = (id, updates) => {
-  const motorcycles = getAllMotorcycles();
-  const index = motorcycles.findIndex((m) => m.id === id);
-  if (index !== -1) {
-    motorcycles[index] = { ...motorcycles[index], ...updates };
-    saveMotorcycles(motorcycles);
-    return motorcycles[index];
+// Upload image to Supabase Storage
+export const uploadImage = async (file, path) => {
+  if (!file) return "";
+  try {
+    const fileName = `${path}_${Date.now()}.jpg`;
+    const { data, error } = await supabase.storage
+      .from("motorcycle-images")
+      .upload(fileName, file, { cacheControl: "3600", upsert: false });
+    if (error) throw error;
+    const { data: publicUrlData } = supabase.storage
+      .from("motorcycle-images")
+      .getPublicUrl(fileName);
+    return publicUrlData.publicUrl;
+  } catch (error) {
+    console.error("Upload error:", error);
+    return "";
   }
-  return null;
 };
 
-//to Delete motorcycle
-export const deleteMotorcycle = (id) => {
-  const motorcycles = getAllMotorcycles();
-  const filtered = motorcycles.filter((m) => m.id !== id);
-  saveMotorcycles(filtered);
+// Get all motorcycles (for admin)
+export const getAllMotorcycles = async () => {
+  const { data, error } = await supabase
+    .from("motorcycles")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
 };
 
-//to Mark as sold
-export const markAsSold = (id, buyerDetails) => {
-  const motorcycles = getAllMotorcycles();
-  const index = motorcycles.findIndex((m) => m.id === id);
-  if (index !== -1) {
-    motorcycles[index].quantity -= 1;
-    if (motorcycles[index].quantity === 0) {
-      motorcycles[index].status = "sold";
-      motorcycles[index].soldAt = new Date().toISOString();
-      motorcycles[index].buyer = buyerDetails;
+// Get motorcycles by vendor
+export const getMotorcyclesByVendor = async (vendorId) => {
+  const { data, error } = await supabase
+    .from("motorcycles")
+    .select("*")
+    .eq("vendor_id", vendorId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+};
+
+// Get available motorcycles (for catalog)
+export const getAvailableMotorcycles = async () => {
+  const { data, error } = await supabase
+    .from("motorcycles")
+    .select("*, users(shop_name, whatsapp, priority)")
+    .eq("status", "available")
+    .gt("quantity", 0)
+    .order("priority", { ascending: false, foreignTable: "users" });
+  if (error) throw error;
+  return data;
+};
+
+// Add motorcycle
+export const addMotorcycle = async (
+  motorcycle,
+  vendorId,
+  shopName,
+  mainImageFile,
+  colorImageFiles,
+) => {
+  try {
+    // Upload main image
+    let mainImageUrl = "";
+    if (mainImageFile) {
+      mainImageUrl = await uploadImage(
+        mainImageFile,
+        `motorcycles/${vendorId}/main`,
+      );
     }
-    saveMotorcycles(motorcycles);
-    return motorcycles[index];
+
+    // Upload color images
+    const updatedColors = await Promise.all(
+      motorcycle.colors.map(async (color, index) => {
+        const colorImageFile = colorImageFiles[index];
+        let images = [];
+        if (colorImageFile) {
+          const url = await uploadImage(
+            colorImageFile,
+            `motorcycles/${vendorId}/color_${index}`,
+          );
+          if (url) images = [url];
+        }
+        return { ...color, images };
+      }),
+    );
+
+    const { data, error } = await supabase
+      .from("motorcycles")
+      .insert([
+        {
+          vendor_id: vendorId,
+          shop_name: shopName,
+          name: motorcycle.name,
+          brand: motorcycle.brand,
+          price: parseInt(motorcycle.price),
+          description_en: motorcycle.description_en || "",
+          description_ha: motorcycle.description_ha || "",
+          main_image_url: mainImageUrl,
+          colors: updatedColors,
+          quantity: parseInt(motorcycle.quantity),
+          images: motorcycle.images || [],
+          status: "available",
+        },
+      ])
+      .select();
+    if (error) throw error;
+    return data[0];
+  } catch (error) {
+    console.error("Add error:", error);
+    throw error;
   }
-  return null;
+};
+
+// Update motorcycle
+export const updateMotorcycle = async (id, updates) => {
+  const { data, error } = await supabase
+    .from("motorcycles")
+    .update(updates)
+    .eq("id", id)
+    .select();
+  if (error) throw error;
+  return data[0];
+};
+
+// Update price
+export const updateMotorcyclePrice = async (id, newPrice) => {
+  const { data, error } = await supabase
+    .from("motorcycles")
+    .update({ price: newPrice })
+    .eq("id", id)
+    .select();
+  if (error) throw error;
+  return data[0];
+};
+
+// Update colors
+export const updateMotorcycleColors = async (id, newColors) => {
+  const { data, error } = await supabase
+    .from("motorcycles")
+    .update({ colors: newColors })
+    .eq("id", id)
+    .select();
+  if (error) throw error;
+  return data[0];
+};
+
+// Delete motorcycle
+export const deleteMotorcycle = async (id) => {
+  const { error } = await supabase.from("motorcycles").delete().eq("id", id);
+  if (error) throw error;
+  return true;
 };

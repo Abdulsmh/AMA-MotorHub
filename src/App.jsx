@@ -49,7 +49,7 @@ function App() {
             <Route path="/contact" element={<ContactPage />} />
 
             {/* Admin Routes */}
-            {/* <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/motorcycles" element={<AdminMotorcycles />} />
             <Route path="/admin/vendors" element={<AdminVendors />} />
             <Route
@@ -57,17 +57,17 @@ function App() {
               element={<AdminAnnouncements />}
             />
             <Route path="/admin/receipts" element={<AdminReceipts />} />
-            <Route path="/admin/settings" element={<AdminSettings />} /> */}
+            <Route path="/admin/settings" element={<AdminSettings />} />
 
             {/* Vendor Routes */}
-            {/* <Route path="/vendor/dashboard" element={<VendorDashboard />} /> */}
+            <Route path="/vendor/dashboard" element={<VendorDashboard />} />
             <Route path="/vendor/motorcycles" element={<MyMotorcycles />} />
-            {/* <Route path="/vendor/add-bike" element={<AddMotorcycle />} />
-            <Route path="/vendor/marketplace" element={<Marketplace />} />*/}
+            <Route path="/vendor/add-bike" element={<AddMotorcycle />} />
+            <Route path="/vendor/marketplace" element={<Marketplace />} />
             <Route path="/vendor/prices" element={<PriceList />} />
-            {/*  <Route path="/vendor/sales" element={<Sales />} />
+             <Route path="/vendor/sales" element={<Sales />} />
             <Route path="/vendor/announcements" element={<Announcements />} />
-            <Route path="/vendor/settings" element={<VendorSettings />} /> */}
+            <Route path="/vendor/settings" element={<VendorSettings />} />
 
             {/* Fallback Route */}
             <Route

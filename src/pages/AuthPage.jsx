@@ -41,16 +41,22 @@ const AuthPage = () => {
     setError("");
 
     if (isLogin) {
-      const result = login(formData.identifier, formData.password);
-      if (result.success) navigate("/");
-      else setError("Invalid credentials");
+      // FIXED: Added await here
+      const result = await login(formData.identifier, formData.password);
+      console.log("Login result:", result);
+
+      if (result.success) {
+        navigate("/");
+      } else {
+        setError(result.error || "Invalid credentials");
+      }
     } else {
       if (formData.password !== formData.confirmPassword) {
         setError("Passwords do not match");
         setLoading(false);
         return;
       }
-      const result = signup({
+      const result = await signup({
         fullName: formData.fullName,
         phone: formData.phone,
         whatsapp: formData.whatsapp,
@@ -60,8 +66,11 @@ const AuthPage = () => {
         email: formData.email,
         password: formData.password,
       });
-      if (result.success) navigate("/");
-      else setError(result.error || "Signup failed");
+      if (result.success) {
+        navigate("/");
+      } else {
+        setError(result.error || "Signup failed");
+      }
     }
     setLoading(false);
   };

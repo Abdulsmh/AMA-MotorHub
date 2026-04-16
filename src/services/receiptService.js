@@ -1,16 +1,4 @@
-// Receipt management service
-const RECEIPTS_STORAGE_KEY = "motorcycle_receipts";
-
-// Get all receipts
-export const getAllReceipts = () => {
-  const stored = localStorage.getItem(RECEIPTS_STORAGE_KEY);
-  return stored ? JSON.parse(stored) : [];
-};
-
-// Save receipt
-const saveReceipts = (receipts) => {
-  localStorage.setItem(RECEIPTS_STORAGE_KEY, JSON.stringify(receipts));
-};
+import { supabase } from "../lib/supabase";
 
 // Generate receipt number
 export const generateReceiptNumber = () => {
@@ -23,28 +11,49 @@ export const generateReceiptNumber = () => {
   return `RCP-${year}${month}${day}-${random}`;
 };
 
-// Create new receipt
-export const createReceipt = (receiptData) => {
-  const receipts = getAllReceipts();
-  const newReceipt = {
-    id: `receipt_${Date.now()}`,
-    receiptNumber: generateReceiptNumber(),
-    ...receiptData,
-    createdAt: new Date().toISOString(),
-  };
-  receipts.push(newReceipt);
-  saveReceipts(receipts);
-  return newReceipt;
+// Create receipt
+export const createReceipt = async (receiptData) => {
+  const { data, error } = await supabase
+    .from("receipts")
+    .insert([
+      {
+        receipt_number: generateReceiptNumber(),
+        ...receiptData,
+      },
+    ])
+    .select();
+  if (error) throw error;
+  return data[0];
 };
 
 // Get receipts by vendor
-export const getReceiptsByVendor = (vendorId) => {
-  const receipts = getAllReceipts();
-  return receipts.filter((r) => r.vendorId === vendorId);
+export const getReceiptsByVendor = async (vendorId) => {
+  const { data, error } = await supabase
+    .from("receipts")
+    .select("*")
+    .eq("vendor_id", vendorId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+};
+
+// Get all receipts (admin)
+export const getAllReceipts = async () => {
+  const { data, error } = await supabase
+    .from("receipts")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
 };
 
 // Get receipt by ID
-export const getReceiptById = (id) => {
-  const receipts = getAllReceipts();
-  return receipts.find((r) => r.id === id);
+export const getReceiptById = async (id) => {
+  const { data, error } = await supabase
+    .from("receipts")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error) throw error;
+  return data;
 };

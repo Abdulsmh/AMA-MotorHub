@@ -1,40 +1,43 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { supabase } from "../lib/supabase";
+import { getUserByPhone, createVendor } from "../services/userService";
+import bcrypt from "bcryptjs";
 
 const AuthContext = createContext();
 
 export const useAuth = () => useContext(AuthContext);
 
-// Helper to get users from localStorage
-const getStoredUsers = () => {
-  const stored = localStorage.getItem("motorcycle_users");
-  return stored ? JSON.parse(stored) : [];
-};
-
-// Helper to save users
-const saveUsers = (users) => {
-  localStorage.setItem("motorcycle_users", JSON.stringify(users));
-};
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || "ama1234";
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userType, setUserType] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Check for stored session
     const storedUser = localStorage.getItem("motorcycle_current_user");
     if (storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser);
-      setIsAuthenticated(true);
-      setUserType(parsedUser.type);
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        setIsAuthenticated(true);
+        setUserType(parsedUser.type);
+      } catch (e) {
+        console.error("Error parsing stored user:", e);
+        localStorage.removeItem("motorcycle_current_user");
+      }
     }
+    setLoading(false);
   }, []);
 
-  // Login function
-  const login = (identifier, password) => {
-    // Check for admin login
-    if (identifier === "admin" && password === "ama1234") {
+  const login = async (identifier, password) => {
+    console.log("Login attempt for:", identifier);
+
+    // Admin login
+    if (identifier === "admin" && password === ADMIN_PASSWORD) {
+      console.log("Admin login successful");
       const adminUser = {
         id: "admin-1",
         name: "Administrator",
@@ -51,26 +54,70 @@ export const AuthProvider = ({ children }) => {
       return { success: true, user: adminUser };
     }
 
-    // Check for vendor login
-    const users = getStoredUsers();
-    const vendor = users.find(
-      (u) =>
-        u.phone === identifier &&
-        u.password === password &&
-        u.type === "vendor",
-    );
+    // Vendor login
+    if (supabase) {
+      try {
+        const vendor = await getUserByPhone(identifier);
+        if (vendor && vendor.type === "vendor") {
+          const isPasswordValid = bcrypt.compareSync(password, vendor.password);
+          if (isPasswordValid) {
+            const vendorUser = {
+              id: vendor.id,
+              name: vendor.full_name,
+              phone: vendor.phone,
+              shopName: vendor.shop_name,
+              shopNumber: vendor.shop_number,
+              shopAddress: vendor.shop_address,
+              whatsapp: vendor.whatsapp,
+              email: vendor.email,
+              profilePicture: vendor.profile_picture,
+              type: "vendor",
+              role: "vendor",
+            };
+            localStorage.setItem(
+              "motorcycle_current_user",
+              JSON.stringify(vendorUser),
+            );
+            setUser(vendorUser);
+            setIsAuthenticated(true);
+            setUserType("vendor");
+            return { success: true, user: vendorUser };
+          }
+        }
+      } catch (error) {
+        console.error("Vendor login error:", error);
+      }
+    }
 
-    if (vendor) {
+    return { success: false, error: "Invalid credentials" };
+  };
+
+  const signup = async (userData) => {
+    if (!supabase) {
+      return {
+        success: false,
+        error: "Supabase not configured. Please contact admin.",
+      };
+    }
+
+    try {
+      const salt = bcrypt.genSaltSync(10);
+      const hashedPassword = bcrypt.hashSync(userData.password, salt);
+
+      const newUser = await createVendor({
+        ...userData,
+        password: hashedPassword,
+      });
+
       const vendorUser = {
-        id: vendor.id,
-        name: vendor.fullName,
-        phone: vendor.phone,
-        shopName: vendor.shopName,
-        shopNumber: vendor.shopNumber,
-        shopAddress: vendor.shopAddress,
-        whatsapp: vendor.whatsapp,
-        email: vendor.email,
-        profilePicture: vendor.profilePicture || null,
+        id: newUser.id,
+        name: newUser.full_name,
+        phone: newUser.phone,
+        shopName: newUser.shop_name,
+        shopNumber: newUser.shop_number,
+        shopAddress: newUser.shop_address,
+        whatsapp: newUser.whatsapp,
+        email: newUser.email,
         type: "vendor",
         role: "vendor",
       };
@@ -82,81 +129,26 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
       setUserType("vendor");
       return { success: true, user: vendorUser };
+    } catch (error) {
+      console.error("Signup error:", error);
+      return { success: false, error: error.message };
     }
-
-    return { success: false, error: "Invalid credentials" };
   };
 
-  // Signup function for vendors
-  const signup = (userData) => {
-    const users = getStoredUsers();
-
-    // Check if phone already exists
-    if (users.some((u) => u.phone === userData.phone)) {
-      return { success: false, error: "Phone number already registered" };
-    }
-
-    const newUser = {
-      id: `vendor_${Date.now()}`,
-      ...userData,
-      type: "vendor",
-      verified: false,
-      profilePicture: null,
-      createdAt: new Date().toISOString(),
-    };
-
-    users.push(newUser);
-    saveUsers(users);
-
-    // Auto login after signup
-    const vendorUser = {
-      id: newUser.id,
-      name: newUser.fullName,
-      phone: newUser.phone,
-      shopName: newUser.shopName,
-      shopNumber: newUser.shopNumber,
-      shopAddress: newUser.shopAddress,
-      whatsapp: newUser.whatsapp,
-      email: newUser.email,
-      profilePicture: null,
-      type: "vendor",
-      role: "vendor",
-    };
-
-    localStorage.setItem("motorcycle_current_user", JSON.stringify(vendorUser));
-    setUser(vendorUser);
-    setIsAuthenticated(true);
-    setUserType("vendor");
-
-    return { success: true, user: vendorUser };
-  };
-
-  // Update user function - FIXED to properly update state
-  const updateUser = (updatedUserData) => {
-    // Update current user in state
-    const newUserData = { ...user, ...updatedUserData };
-    setUser(newUserData);
-
-    // Update in localStorage for current session
-    localStorage.setItem(
-      "motorcycle_current_user",
-      JSON.stringify(newUserData),
-    );
-
-    // Update in users array (for persistence across logins)
-    const users = getStoredUsers();
-    const updatedUsers = users.map((u) =>
-      u.phone === newUserData.phone ? { ...u, ...updatedUserData } : u,
-    );
-    saveUsers(updatedUsers);
-  };
-
-  // Logout function
   const logout = () => {
     localStorage.removeItem("motorcycle_current_user");
     setUser(null);
     setIsAuthenticated(false);
     setUserType(null);
+  };
+
+  const updateUser = (updatedUserData) => {
+    const newUserData = { ...user, ...updatedUserData };
+    setUser(newUserData);
+    localStorage.setItem(
+      "motorcycle_current_user",
+      JSON.stringify(newUserData),
+    );
   };
 
   return (
@@ -165,6 +157,7 @@ export const AuthProvider = ({ children }) => {
         user,
         isAuthenticated,
         userType,
+        loading,
         login,
         signup,
         logout,
