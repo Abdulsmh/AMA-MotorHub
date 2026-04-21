@@ -13,6 +13,7 @@ import {
   FiPlusCircle,
   FiBell,
   FiCreditCard,
+  FiImage,
 } from "react-icons/fi";
 
 const Sidebar = () => {
@@ -52,6 +53,11 @@ const Sidebar = () => {
           path: "/admin/vendors",
           label: "Vendors",
           icon: <FiUsers className="w-4 h-4" />,
+        },
+        {
+          path: "/admin/carousel",
+          label: "Carousel",
+          icon: <FiImage className="w-4 h-4" />,
         },
         {
           path: "/admin/announcements",
@@ -250,18 +256,6 @@ const Sidebar = () => {
               </button>
             </div>
           )}
-
-          {/* {isCustomer && (
-            <div className="p-4 border-t border-gray-100">
-              <Link
-                to="/login"
-                onClick={() => setIsOpen(false)}
-                className="block w-full px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm text-center font-medium hover:bg-emerald-700 transition-colors"
-              >
-                Login / Sign Up
-              </Link>
-            </div>
-          )} */}
         </div>
       </aside>
     </>

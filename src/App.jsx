@@ -19,6 +19,7 @@ import AdminMotorcycles from "./pages/admin/AdminMotorcycles";
 import AdminAnnouncements from "./pages/admin/AdminAnnouncements";
 import AdminReceipts from "./pages/admin/AdminReceipts";
 import AdminSettings from "./pages/admin/AdminSettings";
+import AdminCarousel from "./pages/admin/AdminCarousel";
 
 // Vendor Pages
 import MyMotorcycles from "./pages/vendor/MyMotorcycles";
@@ -29,6 +30,7 @@ import Sales from "./pages/vendor/Sales";
 import Announcements from "./pages/vendor/Announcements";
 import VendorSettings from "./pages/vendor/VendorSettings";
 import VendorDashboard from "./pages/vendor/VendorDashboard";
+
 
 
 function App() {
@@ -57,6 +59,7 @@ function App() {
             />
             <Route path="/admin/receipts" element={<AdminReceipts />} />
             <Route path="/admin/settings" element={<AdminSettings />} />
+            <Route path="/admin/carousel" element={<AdminCarousel />} />;
             {/* Vendor Routes */}
             <Route path="/vendor/dashboard" element={<VendorDashboard />} />
             <Route path="/vendor/motorcycles" element={<MyMotorcycles />} />

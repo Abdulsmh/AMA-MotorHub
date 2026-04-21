@@ -8,6 +8,7 @@ import {
   FiCheckCircle,
   FiArrowRight,
   FiSearch,
+  FiShare2,
 } from "react-icons/fi";
 import { FaWhatsapp } from "react-icons/fa";
 
@@ -24,30 +25,23 @@ const HomePage = () => {
     try {
       setLoading(true);
 
-      console.log("Fetching featured motorcycles...");
-
       const { data: bikes, error } = await supabase
         .from("motorcycles")
-        .select("*")
+        .select(
+          "id, vendor_id, name, brand, price, quantity, images, status, created_at, description_en",
+        )
         .eq("status", "available")
         .gt("quantity", 0)
         .order("created_at", { ascending: false })
         .limit(8);
 
-      if (error) {
-        console.error("Error loading bikes:", error);
-        return;
-      }
-
-      console.log("Featured bikes found:", bikes?.length || 0);
+      if (error) throw error;
 
       if (!bikes || bikes.length === 0) {
         setFeaturedBikes([]);
-        setLoading(false);
         return;
       }
 
-      // Get vendor info
       const vendorIds = [
         ...new Set(bikes.map((b) => b.vendor_id).filter(Boolean)),
       ];
@@ -56,15 +50,15 @@ const HomePage = () => {
       if (vendorIds.length > 0) {
         const { data: vendors } = await supabase
           .from("users")
-          .select("id, shop_name, whatsapp, priority, verified")
+          .select("id, shop_name, whatsapp, verified, phone, shop_address")
           .in("id", vendorIds);
 
         vendors?.forEach((v) => {
           vendorMap[v.id] = {
             shopName: v.shop_name || "Unknown Shop",
-            whatsapp: v.whatsapp || "",
-            priority: v.priority || 0,
+            whatsapp: v.whatsapp || v.phone || "",
             verified: v.verified || false,
+            shopAddress: v.shop_address || "",
           };
         });
       }
@@ -73,8 +67,8 @@ const HomePage = () => {
         ...bike,
         shopName: vendorMap[bike.vendor_id]?.shopName || "Unknown Shop",
         shopWhatsapp: vendorMap[bike.vendor_id]?.whatsapp || "",
-        shopPriority: vendorMap[bike.vendor_id]?.priority || 0,
         shopVerified: vendorMap[bike.vendor_id]?.verified || false,
+        shopAddress: vendorMap[bike.vendor_id]?.shopAddress || "",
       }));
 
       setFeaturedBikes(bikesWithVendors);
@@ -89,10 +83,49 @@ const HomePage = () => {
     return new Intl.NumberFormat("en-NG").format(price);
   };
 
+  const getImageUrl = (image) => {
+    if (image && image[0]) return image[0];
+    return "https://placehold.co/400x300/e2e8f0/64748b?text=No+Image";
+  };
+
+  // Enhanced WhatsApp share function with all motorcycle details
+  const shareOnWhatsApp = (bike) => {
+    const imageUrl = getImageUrl(bike.images);
+    const currentDate = new Date().toLocaleString("en-NG", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const message = `🏍️ *NEW MOTORCYCLE INQUIRY* 🏍️
+━━━━━━━━━━━━━━━━━━━━━
+📸 *Image:* ${imageUrl}
+━━━━━━━━━━━━━━━━━━━━━
+🏍️ *Model:* ${bike.name}
+🏷️ *Brand:* ${bike.brand}
+💰 *Price:* ₦${formatPrice(bike.price)}
+📦 *Stock:* ${bike.quantity} unit(s) available
+🏪 *Shop:* ${bike.shopName}
+📍 *Location:* ${bike.shopAddress || "Kano, Nigeria"}
+⭐ *Verified:* ${bike.shopVerified ? "✓ Verified Shop" : "Standard Shop"}
+━━━━━━━━━━━━━━━━━━━━━
+📝 *Description:*
+${bike.description_en ? bike.description_en.substring(0, 200) : "No description available"}${bike.description_en?.length > 200 ? "..." : ""}
+━━━━━━━━━━━━━━━━━━━━━
+🔗 *View Details:* ${window.location.origin}/shop/${bike.vendor_id}
+⏰ *Inquiry Time:* ${currentDate}
+━━━━━━━━━━━━━━━━━━━━━
+💬 Reply to this message to inquire about this motorcycle.`;
+
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${bike.shopWhatsapp}?text=${encodedMessage}`;
+    window.open(whatsappUrl, "_blank");
+  };
+
   const getWelcomeMessage = () => {
-    if (!isAuthenticated) {
-      return null;
-    }
+    if (!isAuthenticated) return null;
     if (userType === "admin") {
       return {
         title: `Welcome back, Admin`,
@@ -112,9 +145,25 @@ const HomePage = () => {
 
   const welcome = getWelcomeMessage();
 
+  if (loading) {
+    return (
+      <div className="w-full">
+        <div className="bg-gradient-to-r from-emerald-700 to-emerald-600 rounded-2xl h-[400px] animate-pulse mb-6"></div>
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div
+              key={i}
+              className="bg-gray-100 rounded-xl h-64 animate-pulse"
+            ></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full">
-      {/* Hero Carousel - Only for non-authenticated users */}
+      {/* Hero Carousel */}
       {!isAuthenticated && <HeroCarousel />}
 
       {/* Welcome Banner for logged-in users */}
@@ -150,79 +199,77 @@ const HomePage = () => {
           </Link>
         </div>
 
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="text-gray-500">Loading motorcycles...</div>
-          </div>
-        ) : featuredBikes.length === 0 ? (
+        {featuredBikes.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
             <p className="text-gray-500">No motorcycles available yet.</p>
-            <p className="text-xs text-gray-400 mt-2">Check back later!</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {featuredBikes.map((bike) => (
-              <Link
+              <div
                 key={bike.id}
-                to={`/shop/${bike.vendor_id}`}
                 className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition group"
               >
-                <div className="aspect-square bg-gray-100">
-                  {bike.images && bike.images[0] ? (
+                {/* Clickable area for navigation (excluding WhatsApp button) */}
+                <Link to={`/shop/${bike.vendor_id}`} className="block">
+                  <div className="aspect-square bg-gray-100">
                     <img
-                      src={bike.images[0]}
+                      src={getImageUrl(bike.images)}
                       alt={bike.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                      loading="lazy"
+                      onError={(e) => {
+                        e.target.src =
+                          "https://placehold.co/400x300/e2e8f0/64748b?text=No+Image";
+                      }}
                     />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                      No image
+                  </div>
+                  <div className="p-3">
+                    <div className="flex items-start justify-between gap-1">
+                      <h3 className="font-semibold text-gray-800 text-sm truncate flex-1">
+                        {bike.name}
+                      </h3>
+                      {bike.shopVerified && (
+                        <span className="inline-flex items-center gap-0.5 text-[9px] bg-blue-50 text-blue-600 px-1 py-0.5 rounded-full">
+                          <FiCheckCircle className="w-2 h-2" />
+                        </span>
+                      )}
                     </div>
-                  )}
-                </div>
-                <div className="p-3">
-                  <div className="flex items-start justify-between gap-1">
-                    <h3 className="font-semibold text-gray-800 text-sm truncate flex-1">
-                      {bike.name}
-                    </h3>
-                    {bike.shopVerified && (
-                      <span className="inline-flex items-center gap-0.5 text-[9px] bg-blue-50 text-blue-600 px-1 py-0.5 rounded-full flex-shrink-0">
-                        <FiCheckCircle className="w-2 h-2" />
+                    <p className="text-xs text-gray-500">{bike.brand}</p>
+                    <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1 truncate">
+                      <FiMapPin className="w-3 h-3 flex-shrink-0" />
+                      <span className="truncate">{bike.shopName}</span>
+                    </p>
+                    <p className="text-sm font-bold text-emerald-600 mt-2">
+                      ₦{formatPrice(bike.price)}
+                    </p>
+                    <div className="mt-2 flex justify-between items-center">
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                          bike.quantity <= 3
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-green-100 text-green-700"
+                        }`}
+                      >
+                        {bike.quantity <= 3
+                          ? `Only ${bike.quantity} left`
+                          : "In Stock"}
                       </span>
-                    )}
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-500">{bike.brand}</p>
-                  <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1 truncate">
-                    <FiMapPin className="w-3 h-3 flex-shrink-0" />
-                    <span className="truncate">{bike.shopName}</span>
-                  </p>
-                  <p className="text-sm font-bold text-emerald-600 mt-2">
-                    ₦{formatPrice(bike.price)}
-                  </p>
-                  <div className="mt-2 flex justify-between items-center">
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                        bike.quantity <= 3
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-green-100 text-green-700"
-                      }`}
-                    >
-                      {bike.quantity <= 3
-                        ? `Only ${bike.quantity} left`
-                        : "In Stock"}
-                    </span>
-                    <a
-                      href={`https://wa.me/${bike.shopWhatsapp}?text=Hello%2C%20I'm%20interested%20in%20your%20${encodeURIComponent(bike.name)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-green-600 hover:text-green-700"
-                    >
-                      <FaWhatsapp className="w-4 h-4" />
-                    </a>
-                  </div>
+                </Link>
+
+                {/* WhatsApp Button - Enhanced with full details */}
+                <div className="px-3 pb-3">
+                  <button
+                    onClick={() => shareOnWhatsApp(bike)}
+                    className="flex items-center justify-center gap-1 w-full py-1.5 bg-green-500 text-white text-xs rounded-lg hover:bg-green-600 transition"
+                  >
+                    <FaWhatsapp className="w-3 h-3" />
+                    WhatsApp Inquiry
+                  </button>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}
